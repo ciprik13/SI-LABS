@@ -17,7 +17,7 @@ void app_lab_1_2_setup() {
     delay(500);
     
     lcd.clear();
-    lcd.print("System Ready!");
+    printf("System Ready!");
     delay(2000);
 }
 
@@ -37,7 +37,7 @@ void app_lab_1_2_loop() {
     
     for(int i = 0; i < 4; i++) {
         scanf("%c", &input[i]);
-        lcd.print(input[i]);
+        printf("%c", input[i]);
         delay(50);
     }
 
