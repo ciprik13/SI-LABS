@@ -20,16 +20,11 @@ void app_lab_2_1_setup() {
 }
 
 void app_lab_2_1_loop() {
-    int led_state = dd_led_is_on();
-
-    int led_blink_state = dd_led_1_is_on();
-
-    int blink_count = g_task3_blink_count;
+    dd_led_apply();
 
     printf("App Lab 2.1: Idle | LED1=%s | LED2(blink)=%s | BlinkCount=%d\n",
-           led_state      ? "ON"  : "OFF",
-           led_blink_state ? "ON"  : "OFF",
-           blink_count);
-
+           dd_led_is_on()   ? "ON" : "OFF",
+           dd_led_1_is_on() ? "ON" : "OFF",
+           g_task3_blink_count);
     delay(1000);
 }

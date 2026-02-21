@@ -1,26 +1,31 @@
 #include "task_3.h"
 #include "dd_button/dd_button.h"
 
-volatile int g_task3_blink_count = TASK_3_VAR_DEFAULT;
+int g_task3_blink_count = TASK_3_VAR_DEFAULT;
+
+static int debounce_cnt = 0;
 
 void task_3_setup() {
-
+    debounce_cnt = 0;
 }
 
 void task_3_loop() {
+    if (debounce_cnt > 0) {
+        debounce_cnt--;
+        return;
+    }
     if (dd_button_1_is_pressed()) {
-        printf("TASK 3: Button UP Pressed\\n");
         if (g_task3_blink_count < TASK_3_VAR_MAX) {
             g_task3_blink_count++;
         }
-        delay(300);
+        printf("TASK 3: Button UP - BlinkCount=%d\n", g_task3_blink_count);
+        debounce_cnt = 3;
     }
-
-    if (dd_button_2_is_pressed()) {
-        printf("TASK 3: Button DOWN Pressed\\n");
+    else if (dd_button_2_is_pressed()) {
         if (g_task3_blink_count > TASK_3_VAR_MIN) {
             g_task3_blink_count--;
         }
-        delay(300);
+        printf("TASK 3: Button DOWN - BlinkCount=%d\n", g_task3_blink_count);
+        debounce_cnt = 3;
     }
 }
