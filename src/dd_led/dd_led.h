@@ -3,17 +3,16 @@
 
 #include <Arduino.h>
 
-#define LED_RED 0
-#define LED_GREEN 1
-
-#define LED_RED_PIN 10
-#define LED_GREEN_PIN 11
+#define LED_PIN LED_BUILTIN
+#define LED_1_PIN 12
 
 void dd_led_setup();
-void dd_led_turn_on(int led_id);
-void dd_led_turn_off(int led_id);
+void dd_led_turn_on();
+void dd_led_turn_off();
+void dd_led_1_turn_on();
+void dd_led_1_turn_off();
 
-int dd_led_is_on(int led_id);
-
+int dd_led_is_on();
+int dd_led_1_is_on();
 
 #endif
