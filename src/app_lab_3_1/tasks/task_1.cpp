@@ -12,7 +12,7 @@ static int debounce_cnt = 0;
 #define DEBOUNCE_MS 50
 #define MIN_PRESS_MS 10
 
-void app_lab_3_1_task_1_setup() {
+void task_1_setup() {
     btn_was_pressed = 0;
     press_tick = 0;
     debounce_cnt = 0;
@@ -20,7 +20,7 @@ void app_lab_3_1_task_1_setup() {
     g_new_press_event = 0;
 }
 
-void app_lab_3_1_task_1_loop() {
+void task_1_loop() {
     if (debounce_cnt > 0) {
         debounce_cnt--;
         return;

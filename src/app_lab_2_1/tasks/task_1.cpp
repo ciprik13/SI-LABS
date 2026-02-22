@@ -4,11 +4,11 @@
 
 static int debounce_cnt = 0;
 
-void task_1_setup(){
+void app_lab_2_1_task_1_setup(){
     debounce_cnt = 0;
 }
 
-void task_1_loop(){
+void app_lab_2_1_task_1_loop(){
     if (debounce_cnt > 0) {
         debounce_cnt--;
         return;

@@ -13,9 +13,9 @@ void app_lab_2_1_setup() {
     dd_button_setup();
     srv_serial_stdio_setup();
     svr_os_seq_setup();
-    task_1_setup();
-    task_2_setup();
-    task_3_setup();
+    app_lab_2_1_task_1_setup();
+    app_lab_2_1_task_2_setup();
+    app_lab_2_1_task_3_setup();
     printf("App Lab 2.1: Started\n");
 }
 

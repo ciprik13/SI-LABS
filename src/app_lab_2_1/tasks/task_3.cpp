@@ -5,11 +5,12 @@ int g_task3_blink_count = TASK_3_VAR_DEFAULT;
 
 static int debounce_cnt = 0;
 
-void task_3_setup() {
+void app_lab_2_1_task_3_setup() {
+    g_task3_blink_count = TASK_3_VAR_DEFAULT;
     debounce_cnt = 0;
 }
 
-void task_3_loop() {
+void app_lab_2_1_task_3_loop() {
     if (debounce_cnt > 0) {
         debounce_cnt--;
         return;

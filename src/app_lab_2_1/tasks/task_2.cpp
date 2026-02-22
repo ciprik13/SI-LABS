@@ -4,12 +4,12 @@
 
 static int blink_tick_cnt = 0;
 
-void task_2_setup()
+void app_lab_2_1_task_2_setup()
 {
     blink_tick_cnt = 0;
 }
 
-void task_2_loop()
+void app_lab_2_1_task_2_loop()
 {
     if (dd_led_is_on())
     {
