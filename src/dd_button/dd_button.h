@@ -2,9 +2,9 @@
 #define DD_BUTTON_H
 #include <Arduino.h>
 
-#define BUTTON_PIN   2
-#define BUTTON_1_PIN 3
-#define BUTTON_2_PIN 4
+#define BTN_PIN    2
+#define BTN_1_PIN  3
+#define BTN_2_PIN  4
 
 void dd_button_setup();
 int  dd_button_is_pressed();
