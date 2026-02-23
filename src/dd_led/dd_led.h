@@ -3,9 +3,9 @@
 
 #include <Arduino.h>
 
-#define LED_PIN    13  // red
-#define LED_1_PIN  12  // green
-#define LED_2_PIN  11  // yellow
+#define LED_RED_PIN     13
+#define LED_GREEN_PIN   12
+#define LED_YELLOW_PIN  11
 
 void dd_led_setup();
 
