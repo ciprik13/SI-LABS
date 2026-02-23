@@ -2,50 +2,51 @@
 #include "task_1.h"
 #include "dd_led/dd_led.h"
 
-int g_total_presses = 0;
-int g_short_presses = 0;
-int g_long_presses  = 0;
-int g_sum_short_ms  = 0;
-int g_sum_long_ms   = 0;
+int g_press_count    = 0;
+int g_quick_count    = 0;
+int g_hold_count     = 0;
+int g_quick_total_ms = 0;
+int g_hold_total_ms  = 0;
 
-static int blink_remaining = 0;
-static int blink_phase = 0;
+static int flashes_left  = 0;
+static int led_state     = 0;
 
 void task_2_setup() {
-    g_total_presses = 0;
-    g_short_presses = 0;
-    g_long_presses  = 0;
-    g_sum_short_ms  = 0;
-    g_sum_long_ms   = 0;
-    blink_remaining = 0;
-    blink_phase     = 0;
+    g_press_count    = 0;
+    g_quick_count    = 0;
+    g_hold_count     = 0;
+    g_quick_total_ms = 0;
+    g_hold_total_ms  = 0;
+    flashes_left     = 0;
+    led_state        = 0;
 }
 
 void task_2_loop() {
-    if (g_new_press_event) {
-        g_new_press_event = 0;
-        int dur = g_last_press_duration_ms;
-        g_total_presses++;
+    if (g_press_ready) {
+        int duration = g_press_length_ms;
+        g_press_ready = 0;
+        g_press_count++;
 
-        if (dur < PRESS_THRESHOLD_MS) {
-            g_short_presses++;
-            g_sum_short_ms += dur;
-            blink_remaining = 5 * 2;
+        if (duration < BTN_LONG_THRESHOLD_MS) {
+            g_quick_count++;
+            g_quick_total_ms += duration;
+            flashes_left = 5 * 2;
         } else {
-            g_long_presses++;
-            g_sum_long_ms += dur;
-            blink_remaining = 10 * 2;
+            g_hold_count++;
+            g_hold_total_ms += duration;
+            flashes_left = 10 * 2;
         }
-        blink_phase = 0;
-        printf("TASK 2: total=%d short=%d long=%d\n",
-               g_total_presses, g_short_presses, g_long_presses);
+
+        led_state = 0;
+        printf("\rTASK 2: total=%d short=%d long=%d\n",
+               g_press_count, g_quick_count, g_hold_count);
     }
 
-    if (blink_remaining > 0) {
-        blink_phase = !blink_phase;
-        dd_led_2_set_target(blink_phase);
-        blink_remaining--;
-        if (blink_remaining == 0) {
+    if (flashes_left > 0) {
+        led_state = !led_state;
+        dd_led_2_set_target(led_state);
+        flashes_left--;
+        if (flashes_left == 0) {
             dd_led_2_set_target(0);
         }
     }
