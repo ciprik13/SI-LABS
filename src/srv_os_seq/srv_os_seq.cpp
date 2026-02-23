@@ -4,9 +4,9 @@
 #include "app_lab_3_1/tasks/task_3.h"
 #include "timer-api.h"
 
-int task_1_cnt = APP_LAB_3_1_TASK_1_OFFSET + APP_LAB_3_1_TASK_1_REC;
-int task_2_cnt = APP_LAB_3_1_TASK_2_OFFSET + APP_LAB_3_1_TASK_2_REC;
-int task_3_cnt = APP_LAB_3_1_TASK_3_OFFSET + APP_LAB_3_1_TASK_3_REC;
+int task_1_cnt = SCHED_BTN_OFFSET    + SCHED_BTN_PERIOD;
+int task_2_cnt = SCHED_BLINK_OFFSET  + SCHED_BLINK_PERIOD;
+int task_3_cnt = SCHED_REPORT_OFFSET + SCHED_REPORT_PERIOD;
 
 void svr_os_seq_setup() {
     timer_init_ISR_1KHz(TIMER_DEFAULT);
@@ -14,15 +14,15 @@ void svr_os_seq_setup() {
 
 void timer_handle_interrupts(int timer) {
     if (--task_1_cnt <= 0) {
-        task_1_cnt = APP_LAB_3_1_TASK_1_REC;
+        task_1_cnt = SCHED_BTN_PERIOD;
         task_1_loop();
     }
     if (--task_2_cnt <= 0) {
-        task_2_cnt = APP_LAB_3_1_TASK_2_REC;
+        task_2_cnt = SCHED_BLINK_PERIOD;
         task_2_loop();
     }
     if (--task_3_cnt <= 0) {
-        task_3_cnt = APP_LAB_3_1_TASK_3_REC;
+        task_3_cnt = SCHED_REPORT_PERIOD;
         task_3_loop();
     }
 }
