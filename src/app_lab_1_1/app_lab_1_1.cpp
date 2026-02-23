@@ -25,12 +25,13 @@ void app_lab_1_1_loop() {
 
     if (strcmp(cmd, "led on") == 0){
         printf("\rLED ON\n");
-        dd_led_turn_on(LED_RED);
+        dd_led_turn_on();
     }
     else if (strcmp(cmd, "led off") == 0){
         printf("\rLED OFF\n");
-        dd_led_turn_off(LED_RED);
+        dd_led_turn_off();
     }
+
     else if (strcmp(cmd, "help") == 0) {
         printf("\rAvailable Commands:\n");
         printf(" - led on    : Turns the LED permanently ON\n");
@@ -38,12 +39,13 @@ void app_lab_1_1_loop() {
         printf(" - led blink : Blinks the LED 3 times\n");
         printf(" - help      : Displays this menu\n");
     }
+
     else if (strcmp(cmd, "led blink") == 0) {
         printf("\rBlinking LED Sequence...\n");
         for(int i = 0; i < 3; i++) {
-            dd_led_turn_on(LED_RED);
+            dd_led_turn_on();
             delay(200); 
-            dd_led_turn_off(LED_RED);
+            dd_led_turn_off();
             delay(200); 
         }
         printf("Sequence Complete.\n");
