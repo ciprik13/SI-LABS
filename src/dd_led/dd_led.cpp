@@ -21,10 +21,12 @@ int dd_led_is_on()   { return red_target; }
 int dd_led_1_is_on() { return green_target; }
 int dd_led_2_is_on() { return yellow_target; }
 
-void dd_led_turn_on()    { red_target   = 1; }
-void dd_led_turn_off()   { red_target   = 0; }
-void dd_led_1_turn_on()  { green_target = 1; }
-void dd_led_1_turn_off() { green_target = 0; }
+void dd_led_turn_on()    { red_target    = 1; digitalWrite(LED_RED_PIN,    HIGH); }
+void dd_led_turn_off()   { red_target    = 0; digitalWrite(LED_RED_PIN,    LOW);  }
+void dd_led_1_turn_on()  { green_target  = 1; digitalWrite(LED_GREEN_PIN,  HIGH); }
+void dd_led_1_turn_off() { green_target  = 0; digitalWrite(LED_GREEN_PIN,  LOW);  }
+void dd_led_2_turn_on()  { yellow_target = 1; digitalWrite(LED_YELLOW_PIN, HIGH); }
+void dd_led_2_turn_off() { yellow_target = 0; digitalWrite(LED_YELLOW_PIN, LOW);  }
 
 void dd_led_apply() {
     digitalWrite(LED_RED_PIN,    red_target    ? HIGH : LOW);
