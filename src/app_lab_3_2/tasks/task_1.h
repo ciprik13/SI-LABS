@@ -3,12 +3,16 @@
 
 #include "Arduino_FreeRTOS.h"
 #include "semphr.h"
+#include "task_config.h"
 
-#define ONE_SEC       1000
-#define TASK_1_REC    10
-#define TASK_1_OFFSET 100
+#define DEBOUNCE_MIN_MS 50    // ignored if shorter (bounce filter)
+#define SHORT_PRESS_MS  500   // pragul scurt/lung (ms)
+#define LED_ON_MS       1000  // cât timp rămâne aprins LED-ul de indicație (ms)
 
-extern SemaphoreHandle_t xSemaphore;
+extern SemaphoreHandle_t xSemaphore;  // semnalizare Task1 → Task2
+extern SemaphoreHandle_t xMutex;      // protecție variabile partajate
+extern SemaphoreHandle_t xReady;      // alternare strictă T1→T2→T1→T2
+extern volatile int g_last_duration;  // ultima durată măsurată (ms)
 
 void task_1(void *pvParameters);
 
