@@ -7,7 +7,7 @@
 
 #define DEBOUNCE_MIN_MS 50    // ignored if shorter (bounce filter)
 #define SHORT_PRESS_MS  500   // pragul scurt/lung (ms)
-#define LED_ON_MS       1000  // cât timp rămâne aprins LED-ul de indicație (ms)
+#define LED_ON_MS       10000  // cât timp rămâne aprins LED-ul de indicație (ms)
 
 extern SemaphoreHandle_t xSemaphore;  // semnalizare Task1 → Task2
 extern SemaphoreHandle_t xMutex;      // protecție variabile partajate
