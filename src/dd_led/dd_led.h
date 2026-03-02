@@ -23,5 +23,7 @@ void dd_led_turn_on();
 void dd_led_turn_off();
 void dd_led_1_turn_on();
 void dd_led_1_turn_off();
+void dd_led_2_turn_on();
+void dd_led_2_turn_off();
 
 #endif
