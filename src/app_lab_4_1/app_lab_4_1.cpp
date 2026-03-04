@@ -1,54 +1,40 @@
 #include "app_lab_4_1.h"
-#include "Arduino_FreeRTOS.h"
+#include "tasks/task_1.h"
+#include "tasks/task_2.h"
+#include "tasks/task_3.h"
 #include "srv_serial_stdio/srv_serial_stdio.h"
-#include "dd_sns_angle/dd_sns_angle.h"
-#include "ed_potentiometer/ed_potentiometer.h"
-#include <Arduino.h>
+#include "srv_stdio_lcd/srv_stdio_lcd.h"
+#include "dd_sns_temperature/dd_sns_temperature.h"
+#include "dd_led/dd_led.h"
+#include <Arduino_FreeRTOS.h>
 
-void app_lab_4_1_angle_sns_task(void *pvParameters) {
-  (void) pvParameters;
-
-  // Offset so the acquisition task does not start at the same time as the report task
-  vTaskDelay(500 / portTICK_PERIOD_MS);
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-
-  for (;;) {
-    dd_sns_angle_loop();
-    vTaskDelayUntil(&xLastWakeTime, 1000 / portTICK_PERIOD_MS);
-  }
-}
-
-void app_lab_4_1_system_report_task(void *pvParameters) {
-  (void) pvParameters;
-
-  for (;;) {
-    int raw     = ed_potentiometer_get_raw();
-    int voltage = ed_potentiometer_get_voltage();
-    int angle   = dd_sns_angle_get_value();
-
-    printf("------------------------------\n");
-    printf("System report: All systems nominal.\n");
-    printf("Sensor RAW:     %4d\n",    raw);
-    printf("Sensor voltage: %4d mV\n", voltage);
-    printf("Sensor angle:   %4d deg\n", angle);
-
-    if (angle > DD_SNS_ANGLE_WARN_THRESHOLD || angle < -DD_SNS_ANGLE_WARN_THRESHOLD) {
-      printf("*** WARNING: Angle out of safe range! ***\n");
-    }
-
-    vTaskDelay(500 / portTICK_PERIOD_MS);
-  }
-}
+// ===========================================================================
+// Application entry point – Lab 4.1
+//
+// Module stack:
+//   ed_potentiometer       – raw ADC driver (A0), potentiometer as temp sensor
+//   dd_sns_temperature     – conversion to voltage + Celsius, sensor mutex
+//   task_1 (Acquisition)   – 50 ms, priority 3
+//   task_2 (Conditioning)  – 50 ms (+10 ms offset), priority 2
+//                            hysteresis + antibounce + LED visual indicator
+//   task_3 (Report)        – 500 ms, priority 1
+//                            structured printf via LCD (STDIO)
+// ===========================================================================
 
 void app_lab_4_1_setup() {
-  srv_serial_stdio_setup();
-  dd_sns_angle_setup();
+    srv_stdio_lcd_setup();            // init LCD (stream available, stdout untouched)
+    srv_serial_stdio_setup();         // route stdout -> Serial (terminal visible)
+    dd_sns_temperature_setup();       // init temperature sensor + sensor mutex
+    dd_led_setup();                   // RED=pin13  GREEN=pin12  YELLOW=pin11
 
-  // higher priority for acquisition, lower for reporting
-  xTaskCreate(app_lab_4_1_angle_sns_task,   "AngleSnsTask",    256, NULL, 2, NULL);
-  xTaskCreate(app_lab_4_1_system_report_task, "SystemReportTask", 256, NULL, 1, NULL);
+    task_2_init();                    // create g_cond_mutex (owned by task_2)
+
+    // Priority: acquisition (3) > conditioning (2) > report (1)
+    xTaskCreate(task_acquisition,  "Acquisition",  256, NULL, 3, NULL);
+    xTaskCreate(task_conditioning, "Conditioning", 256, NULL, 2, NULL);
+    xTaskCreate(task_report,       "Report",       512, NULL, 1, NULL);
 }
 
 void app_lab_4_1_loop() {
-  // FreeRTOS takes over; loop is intentionally empty.
+    // FreeRTOS scheduler takes over; loop intentionally empty.
 }
