@@ -3,10 +3,18 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
-// Wokwi / simulation  → DHT22
-// Physical breadboard  → change to DHT11 (and set ED_DHT_MIN_INTERVAL_MS 1000 in ed_dht.h)
-#define DHTTYPE DHT11
-// #define DHTTYPE DHT11
+// ===========================================================================
+// SENSOR TYPE – schimbă o singură linie în funcție de hardware:
+//
+//   Wokwi (simulator)  → DHT22
+//   Placă fizică        → DHT11
+//
+// Pasul 1: decomentează linia corectă mai jos.
+// Pasul 2: în ed_dht.h ajustează ED_DHT_MIN_INTERVAL_MS:
+//            DHT22 → 2000 ms  |  DHT11 → 1000 ms
+// ===========================================================================
+// #define DHTTYPE DHT22   // ← Wokwi / simulator
+#define DHTTYPE DHT11      // ← Placă fizică (DHT11)
 
 static DHT        s_dht(ED_DHT_PIN, DHTTYPE);
 static int        s_raw      = 0;
