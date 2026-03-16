@@ -1,6 +1,7 @@
 #include "task_2.h"
 #include "dd_sns_temperature/dd_sns_temperature.h"
 #include "dd_sns_dht/dd_sns_dht.h"
+#include "dd_sns_gas/dd_sns_gas.h"
 #include "dd_led/dd_led.h"
 #include <Arduino_FreeRTOS.h>
 #include <semphr.h>
@@ -15,9 +16,13 @@ SemaphoreHandle_t g42_cond1_mutex  = NULL;
 CondFull42_t      g42_cond2        = { 0, 0, 0, 0, false, false, 0 };
 SemaphoreHandle_t g42_cond2_mutex  = NULL;
 
+CondFull42_t      g42_cond3        = { 0, 0, 0, 0, false, false, 0 };
+SemaphoreHandle_t g42_cond3_mutex  = NULL;
+
 void task42_init() {
     g42_cond1_mutex = xSemaphoreCreateMutex();
     g42_cond2_mutex = xSemaphoreCreateMutex();
+    g42_cond3_mutex = xSemaphoreCreateMutex();
 }
 
 // ===========================================================================
@@ -31,6 +36,7 @@ typedef struct {
 
 static FilterBuf_t s_f1 = { {0}, 0, 0 };
 static FilterBuf_t s_f2 = { {0}, 0, 0 };
+static FilterBuf_t s_f3 = { {0}, 0, 0 };
 
 // ---------------------------------------------------------------------------
 // Push a new sample into the circular buffer.
@@ -203,9 +209,33 @@ void task42_conditioning(void *pvParameters) {
         }
 
         // ===================================================================
+        // S3 – MQ-2 Gas Sensor (analog, pin A1)  – value in %
+        // ===================================================================
+        int raw3 = dd_sns_gas_get_percent();
+        int sat3 = saturate(raw3, SAT_LOW_3, SAT_HIGH_3);
+
+        filter_push(&s_f3, sat3);
+        int med3 = filter_median(&s_f3);
+        int wgt3 = filter_weighted(&s_f3);
+
+        bool committed3 = update_alert(&g42_cond3, g42_cond3_mutex,
+                                       wgt3,
+                                       ALERT42_THRESHOLD_HIGH_3,
+                                       ALERT42_THRESHOLD_LOW_3,
+                                       ANTIBOUNCE42_SAMPLES_3);
+
+        if (xSemaphoreTake(g42_cond3_mutex, portMAX_DELAY) == pdTRUE) {
+            g42_cond3.raw       = raw3;
+            g42_cond3.saturated = sat3;
+            g42_cond3.median    = med3;
+            g42_cond3.weighted  = wgt3;
+            xSemaphoreGive(g42_cond3_mutex);
+        }
+
+        // ===================================================================
         // Combined LED indicator
         // ===================================================================
-        bool pending1 = false, pending2 = false;
+        bool pending1 = false, pending2 = false, pending3 = false;
         if (xSemaphoreTake(g42_cond1_mutex, portMAX_DELAY) == pdTRUE) {
             pending1 = (g42_cond1.pending_state != g42_cond1.alert_active) &&
                        (g42_cond1.bounce_count > 0);
@@ -216,12 +246,17 @@ void task42_conditioning(void *pvParameters) {
                        (g42_cond2.bounce_count > 0);
             xSemaphoreGive(g42_cond2_mutex);
         }
+        if (xSemaphoreTake(g42_cond3_mutex, portMAX_DELAY) == pdTRUE) {
+            pending3 = (g42_cond3.pending_state != g42_cond3.alert_active) &&
+                       (g42_cond3.bounce_count > 0);
+            xSemaphoreGive(g42_cond3_mutex);
+        }
 
-        if (committed1 || committed2) {
+        if (committed1 || committed2 || committed3) {
             dd_led_turn_on();    // RED
             dd_led_1_turn_off(); // GREEN
             dd_led_2_turn_off(); // YELLOW
-        } else if (pending1 || pending2) {
+        } else if (pending1 || pending2 || pending3) {
             dd_led_turn_off();   // RED
             dd_led_1_turn_off(); // GREEN
             dd_led_2_turn_on();  // YELLOW

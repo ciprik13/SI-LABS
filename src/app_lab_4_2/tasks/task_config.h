@@ -19,10 +19,10 @@
 // Ajustează limitele de saturare în funcție de senzor:
 //   DHT22: -40..80 °C  |  DHT11: 0..50 °C
 // ===========================================================================
-// #define SAT_LOW_2   -40   // ← DHT22 (Wokwi / simulator)
-// #define SAT_HIGH_2   80   // ← DHT22
-#define SAT_LOW_2         0  // ← DHT11 (placă fizică)
-#define SAT_HIGH_2       50  // ← DHT11
+// #define SAT_LOW_2       -40  // ← DHT22 (Wokwi / simulator)
+// #define SAT_HIGH_2       80   // ← DHT22
+#define SAT_LOW_2     0    // ← DHT11 (placă fizică)
+#define SAT_HIGH_2   50    // ← DHT11
 #define ALERT42_THRESHOLD_HIGH_2   30    // °C  alert ON  edge
 #define ALERT42_THRESHOLD_LOW_2    25    // °C  alert OFF edge (hysteresis)
 #define ANTIBOUNCE42_SAMPLES_2      5    // 5 × 50 ms = 250 ms min persistence
@@ -60,5 +60,22 @@ extern SemaphoreHandle_t g42_cond1_mutex;
 // Sensor 2 (defined in task_2.cpp)
 extern CondFull42_t      g42_cond2;
 extern SemaphoreHandle_t g42_cond2_mutex;
+
+// ===========================================================================
+// Sensor 3 – MQ-2 Gas Sensor (analog, pin A1)  saturation + thresholds
+//
+// Valoarea procesată este în procente (0–100 %).
+// Pragul de alertă implicit: 60 % concentrație.
+// Ajustează SAT_HIGH_3 / ALERT42_THRESHOLD_HIGH_3 în funcție de senzor și mediu.
+// ===========================================================================
+#define SAT_LOW_3                   0    // %  clamp lo
+#define SAT_HIGH_3                100    // %  clamp hi
+#define ALERT42_THRESHOLD_HIGH_3   60    // %  alert ON  edge
+#define ALERT42_THRESHOLD_LOW_3    50    // %  alert OFF edge (hysteresis)
+#define ANTIBOUNCE42_SAMPLES_3      5    // 5 × 50 ms = 250 ms min persistence
+
+// Sensor 3 (defined in task_2.cpp)
+extern CondFull42_t      g42_cond3;
+extern SemaphoreHandle_t g42_cond3_mutex;
 
 #endif // APP_LAB_4_2_TASK_CONFIG_H
