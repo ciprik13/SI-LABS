@@ -11,8 +11,8 @@
 // Ajustează în funcție de senzor (trebuie să corespundă cu DHTTYPE din ed_dht.cpp):
 //   DHT22 → decomentează prima linie  (spec: ≥ 2 s)
 //   DHT11 → decomentează a doua linie (spec: ≥ 1 s)
-// #define ED_DHT_MIN_INTERVAL_MS  2000   // ← DHT22 (Wokwi / simulator)
-#define ED_DHT_MIN_INTERVAL_MS    1000    // ← DHT11 (placă fizică)
+// #define ED_DHT_MIN_INTERVAL_MS    2000   // ← DHT22 (Wokwi / simulator)
+#define ED_DHT_MIN_INTERVAL_MS  1000   // ← DHT11 (placă fizică)
 
 void ed_dht_setup();
 void ed_dht_loop();          // call from acquisition task; throttled internally
