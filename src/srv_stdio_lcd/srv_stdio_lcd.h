@@ -7,4 +7,4 @@ extern LiquidCrystal_I2C lcd;
 
 void srv_stdio_lcd_setup();
 
-#endif
+#endif // SRV_STDIO_LCD_H
