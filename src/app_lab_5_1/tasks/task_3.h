@@ -1,20 +1,17 @@
 #ifndef APP_LAB_5_1_TASK_3_H
 #define APP_LAB_5_1_TASK_3_H
 
-// Task 3 – Binary Actuator Control  (75 ms, priority 2)
+// Task 3 – Display & Reporting
 //
-// Reads g51_bin.committed (from task51_signal_cond) and writes the physical
-// binary actuator pin (BINARY_ACT_PIN = 13, RED LED / relay).
+// Period  : ACTUATOR_REPORT_PERIOD_MS = 500 ms (vTaskDelay)
+// Priority: 1 (lowest)
 //
-// Also updates the GREEN status LED:
-//   GREEN ON  = binary actuator is currently ON
-//   GREEN OFF = binary actuator is currently OFF
+// LCD 16×2 (updated every tick):
+//   Row 0: "B: ON C: ON PD"  (binary state / requested / pending)
+//   Row 1: "A: 180 AU AL"    (applied PWM / mode / alert)
 //
-// Exposes actuator_get_state() for query by other tasks.
+// Serial: printed only when snapshot changed OR heartbeat (10 s) due.
 
-void task51_binary_ctrl(void *pvParameters);
-
-// Internal interface: returns 1 if binary actuator is ON, 0 if OFF
-int binary_actuator_get_state();
+void task51_display(void *pvParameters);
 
 #endif // APP_LAB_5_1_TASK_3_H
