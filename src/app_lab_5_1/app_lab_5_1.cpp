@@ -2,57 +2,56 @@
 #include "tasks/task_1.h"
 #include "tasks/task_2.h"
 #include "tasks/task_3.h"
-#include "tasks/task_4.h"
-#include "tasks/task_5.h"
+#include "tasks/task_config.h"
+#include "act_binary/act_binary.h"
+#include "act_analog/act_analog.h"
 #include "srv_serial_stdio/srv_serial_stdio.h"
 #include "srv_stdio_lcd/srv_stdio_lcd.h"
-#include "dd_led/dd_led.h"
-#include "dd_button/dd_button.h"
 #include "dd_sns_angle/dd_sns_angle.h"
+#include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
 // ===========================================================================
-// Application entry point – Lab 5.1 (Variant C – Binary + Analog Actuator)
+// Application entry point – Lab 5.1  (Variant C – Binary + Analog Actuator)
 //
 // Hardware:
-//   Binary actuator : LED on pin 13 (RED) – simulates relay/lamp
-//   Analog actuator : PWM output on pin 9  – simulates dimmer (0-255)
-//   Input (binary)  : Serial commands "1"/"0"/"ON"/"OFF"/"STATUS"
-//                     Keypad keys    '1' (ON) / '0' (OFF)
-//   Feedback sensor : Potentiometer on A0 → dd_sns_angle (0..270°)
-//                     mapped to PWM level 0–100 % for analog actuator
-//   Display         : LCD 16×2 (I2C) + Serial
-//   Status LEDs     : GREEN (pin 12) = binary actuator ON
-//                     YELLOW (pin 11) = analog actuator active (>10 %)
+//   Binary actuator : Relay on pin 13 (act_binary) – ON/OFF via Serial
+//   Analog actuator : L298N motor driver
+//                     ENA=10 (PWM), IN1=8, IN2=7
+//   Potentiometer   : A0 → dd_sns_angle → AUTO mode analog level
+//   LCD 16×2 I2C    : SDA=20, SCL=21, addr=0x3F
+//   Status LEDs     : PIN_LED_BIN_ON=9  (RED)    – binary actuator ON
+//                     PIN_LED_OK=12     (GREEN)  – no alert
+//                     PIN_LED_ALERT=11  (YELLOW) – analog alert >ANALOG_ALERT_HIGH
 //
-// FreeRTOS task schedule:
-//   task51_cmd_input      – 50 ms,  priority 3  (Serial + keypad reader)
-//   task51_signal_cond    – 50 ms,  priority 2  (debounce + saturation)
-//   task51_binary_ctrl    – 75 ms,  priority 2  (binary actuator driver)
-//   task51_analog_ctrl    – 75 ms,  priority 2  (analog actuator driver)
-//   task51_display        – 500 ms, priority 1  (LCD + Serial report)
-//
-// Variant C justification:
-//   - Binary actuator  : LED (relay-equivalent) – ON/OFF commanded by user
-//   - Analog actuator  : PWM dimmer – level follows potentiometer position
-//   - Both actuators displayed on LCD with alerts
+// FreeRTOS tasks:
+//   task51_task1       – 20 ms,  priority 3  (Serial command input)
+//   task51_conditioning– 25 ms,  priority 2  (actuator control + snapshot)
+//   task51_display     – 500 ms, priority 1  (LCD + Serial report)
 // ===========================================================================
 
 void app_lab_5_1_setup() {
-    srv_serial_stdio_setup();     // Serial (9600 baud) + printf/scanf redirect
-    srv_stdio_lcd_setup();        // LCD 16×2 I2C + tee to Serial
-    dd_led_setup();               // RED=13, GREEN=12, YELLOW=11
-    dd_button_setup();            // physical buttons (optional, same pins as keypad)
-    dd_sns_angle_setup();         // potentiometer on A0 → analog actuator level
+    srv_serial_stdio_setup();    // Serial 9600 baud + printf redirect
+    srv_stdio_lcd_setup();       // LCD 16×2 I2C stdout tee (addr 0x3F)
+    dd_sns_angle_setup();        // potentiometer on A0 + mutex
 
-    task51_init();                // create all shared mutexes / semaphores
+    // Binary actuator — LED on pin 9 (mirrors motor ON state)
+    act_binary_init(13);   // pin 13 = relay module IN
 
-    // Higher number = higher FreeRTOS priority
-    xTaskCreate(task51_cmd_input,   "Cmd51",   384, NULL, 3, NULL);
-    xTaskCreate(task51_signal_cond, "Cond51",  256, NULL, 2, NULL);
-    xTaskCreate(task51_binary_ctrl, "Bin51",   256, NULL, 2, NULL);
-    xTaskCreate(task51_analog_ctrl, "Anlg51",  256, NULL, 2, NULL);
-    xTaskCreate(task51_display,     "Disp51",  512, NULL, 1, NULL);
+    // Analog actuator — L298N motor driver
+    act_analog_init(PIN_MOTOR_ENA, PIN_MOTOR_IN1, PIN_MOTOR_IN2);
+
+    // Status LEDs — direct GPIO (not via dd_led driver)
+    pinMode(PIN_LED_BIN_ON, OUTPUT);  digitalWrite(PIN_LED_BIN_ON, LOW);
+    pinMode(PIN_LED_OK,     OUTPUT);  digitalWrite(PIN_LED_OK,     HIGH);
+    pinMode(PIN_LED_ALERT,  OUTPUT);  digitalWrite(PIN_LED_ALERT,  LOW);
+
+    task51_task1_init();   // creates task_1 internal mutex
+    task51_init();         // creates g_app5_snapshot_mutex
+
+    xTaskCreate(task51_task1,        "Task1_51", 512, NULL, 3, NULL);
+    xTaskCreate(task51_conditioning, "Task2_51", 512, NULL, 2, NULL);
+    xTaskCreate(task51_display,      "Task3_51", 768, NULL, 1, NULL);
 }
 
 void app_lab_5_1_loop() {
