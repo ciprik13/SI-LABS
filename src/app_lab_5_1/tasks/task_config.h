@@ -3,89 +3,67 @@
 
 #include <Arduino_FreeRTOS.h>
 #include <semphr.h>
-#include <stdint.h>
-#include <stdbool.h>
 
 // ===========================================================================
-// Hardware pin definitions
+// task_config.h – Shared types and constants for Lab 5.1
+//
+// Internal actuator state is hidden inside act_binary.cpp / act_analog.cpp.
+// Tasks access actuators exclusively through the public API functions.
 // ===========================================================================
-#define BINARY_ACT_PIN      13   // RED LED – simulates relay / lamp
-#define ANALOG_ACT_PIN       9   // PWM output – simulates dimmer (0-255)
 
-// ===========================================================================
-// Binary actuator – debounce & saturation
-// ===========================================================================
-#define BIN_DEBOUNCE_SAMPLES    3   // 3 × 50 ms = 150 ms min persistence
-#define BIN_SAT_ON              1   // saturated ON value
-#define BIN_SAT_OFF             0   // saturated OFF value
+// --- Task periods -----------------------------------------------------------
+#define ACTUATOR_CMD_PERIOD_MS          20    // task_1: command input
+#define ACTUATOR_COND_PERIOD_MS         25    // task_2: conditioning + apply
+#define ACTUATOR_REPORT_PERIOD_MS      500    // task_3: display tick
+#define ACTUATOR_SERIAL_HEARTBEAT_MS 10000    // task_3: force-print interval
 
-// ===========================================================================
-// Analog actuator – operating range (percent)
-// ===========================================================================
-#define ANLG_SAT_LOW            0   // % minimum
-#define ANLG_SAT_HIGH         100   // % maximum
-#define ANLG_ALERT_THRESHOLD   80   // % – alert if level exceeds this
-#define ANLG_ALERT_HYST        70   // % – alert clears below this (hysteresis)
-#define ANLG_DEBOUNCE_SAMPLES   4   // 4 × 75 ms = 300 ms min persistence
+// --- Debounce ---------------------------------------------------------------
+#define BIN_CMD_PERSISTENCE_SAMPLES      3    // 3 × 20 ms = 60 ms min persist
 
-// ===========================================================================
-// Command source identifier
-// ===========================================================================
-#define CMD_SRC_SERIAL   's'
+// --- Hardware pins ----------------------------------------------------------
+#define PIN_LED_BIN_ON    9    // RED    – motor ON indicator (mirrors binary actuator state)
+#define PIN_LED_OK       12    // GREEN  – system OK / no analog alert
+#define PIN_LED_ALERT    11    // YELLOW – analog alert active
 
-// ===========================================================================
-// Shared command state
-// Written by task51_cmd_input, read by task51_signal_cond.
-// Protected by g51_cmd_mutex.
-// ===========================================================================
+#define PIN_MOTOR_ENA    10    // L298N ENA – PWM speed
+#define PIN_MOTOR_IN1     8    // L298N IN1 – direction A
+#define PIN_MOTOR_IN2     7    // L298N IN2 – direction B
+
+// --- Analog actuator thresholds (PWM 0-255) ---------------------------------
+#define ANALOG_PWM_MIN     0
+#define ANALOG_PWM_MAX   255
+#define ANALOG_ALERT_HIGH  220   // PWM alert ON  edge
+#define ANALOG_ALERT_LOW   200   // PWM alert OFF edge (hysteresis)
+
+// --- Analog control mode ----------------------------------------------------
+typedef enum {
+    ANALOG_MODE_AUTO   = 0,   // level follows potentiometer
+    ANALOG_MODE_MANUAL = 1    // level set by "PWM <val>" Serial command
+} AnalogControlMode_t;
+
+// --- User command – produced by task_1, consumed by task_2 -----------------
 typedef struct {
-    int  raw_cmd;        // 1 = ON requested, 0 = OFF requested, -1 = none
-    char source;         // CMD_SRC_SERIAL or CMD_SRC_KEYPAD
-    bool invalid_cmd;    // true if last command string was unrecognised
-} CmdState51_t;
+    bool                bin_requested;  // true=ON, false=OFF
+    AnalogControlMode_t analog_mode;
+    int                 manual_pwm;     // valid when analog_mode == MANUAL
+} App5UserCmd_t;
 
-extern CmdState51_t      g51_cmd;
-extern SemaphoreHandle_t g51_cmd_mutex;
-
-// ===========================================================================
-// Shared binary actuator state
-// Written by task51_signal_cond & task51_binary_ctrl,
-// read by task51_display.
-// Protected by g51_bin_mutex.
-// ===========================================================================
+// --- Snapshot – produced by task_2, consumed by task_3 ---------------------
 typedef struct {
-    int  requested;      // last sanitised command (0 or 1)
-    int  pending;        // candidate value being debounced
-    int  bounce_count;   // consecutive confirmations of pending
-    int  committed;      // committed (debounced) state
-    bool actuator_on;    // actual pin output state
-    bool in_error;       // set if hardware write fails (stub: always false)
-} BinActState51_t;
+    bool                bin_requested;
+    bool                bin_pending;
+    bool                bin_state;
+    AnalogControlMode_t analog_mode;
+    int                 angle_deg;
+    int                 analog_requested_pwm;
+    int                 analog_applied_pwm;
+    bool                analog_alert;
+} App5Snapshot_t;
 
-extern BinActState51_t   g51_bin;
-extern SemaphoreHandle_t g51_bin_mutex;
+extern App5Snapshot_t    g_app5_snapshot;
+extern SemaphoreHandle_t g_app5_snapshot_mutex;
 
-// ===========================================================================
-// Shared analog actuator state
-// Written by task51_analog_ctrl, read by task51_display.
-// Protected by g51_anlg_mutex.
-// ===========================================================================
-typedef struct {
-    int  raw_pot;        // raw potentiometer reading (0–100 %)
-    int  saturated;      // after saturation clamping
-    int  pwm_value;      // 0–255 written to ANALOG_ACT_PIN
-    int  level_pct;      // 0–100 % (display friendly)
-    bool alert_active;   // committed over-threshold alert
-    bool pending_alert;  // candidate alert being debounced
-    int  alert_bounce;   // consecutive confirmations of pending_alert
-} AnlgActState51_t;
-
-extern AnlgActState51_t  g51_anlg;
-extern SemaphoreHandle_t g51_anlg_mutex;
-
-// ===========================================================================
-// Initialise all mutexes (call once before xTaskCreate)
-// ===========================================================================
+// --- Init – call once before xTaskCreate ------------------------------------
 void task51_init();
 
 #endif // APP_LAB_5_1_TASK_CONFIG_H

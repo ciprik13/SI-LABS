@@ -5,88 +5,176 @@
 #include <Arduino.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 // ===========================================================================
-// Task 1 – Command Input  (50 ms period, priority 3)
+// Task 1 – Command Input  (20 ms period, priority 3)
 //
-// Reads one line at a time from Serial (non-blocking; accumulates chars each
-// tick).
+// Strategy: accumulate Serial bytes each tick (non-blocking).
+// On '\n': sscanf() on the complete line — guaranteed not to block.
 //
-// Accepted commands (case-insensitive):
-//   "1" / "ON"   → request binary actuator ON
-//   "0" / "OFF"  → request binary actuator OFF
-//   "STATUS"     → no state change (display always shows current status)
-//
-// Any other input sets invalid_cmd = true; the display task shows a warning.
+// Commands:
+//   ON              → binary actuator ON
+//   OFF             → binary actuator OFF
+//   AUTO            → analog mode: follow potentiometer
+//   PWM <0..255>    → analog mode: fixed PWM value
+//   HELP            → print command list
 // ===========================================================================
 
-#define CMD_BUF_LEN 16
-static char    s_buf[CMD_BUF_LEN];
-static uint8_t s_len = 0;
+#define LINE_BUF_LEN  40
+#define MTX_TIMEOUT   pdMS_TO_TICKS(10)
 
-static void to_upper(char *s) {
-    while (*s) { *s = (char)toupper((unsigned char)*s); s++; }
+static App5UserCmd_t     s_cmd       = { false, ANALOG_MODE_AUTO, 0 };
+static SemaphoreHandle_t s_cmd_mutex = NULL;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+static void str_to_upper(char *text) {
+    for (int i = 0; text[i] != '\0'; i++)
+        text[i] = (char)toupper((unsigned char)text[i]);
 }
 
-// Returns 1 (ON), 0 (OFF), or -1 (STATUS / unknown).
-// Sets *invalid = true if the command is unrecognised.
-static int parse_cmd(char *line, bool *invalid) {
-    to_upper(line);
-    *invalid = false;
-
-    if (strcmp(line, "1")      == 0 || strcmp(line, "ON")  == 0) return 1;
-    if (strcmp(line, "0")      == 0 || strcmp(line, "OFF") == 0) return 0;
-    if (strcmp(line, "STATUS") == 0)                              return -1;
-
-    *invalid = true;
-    return -1;
+static char *trim_whitespace(char *text) {
+    while (*text != '\0' && isspace((unsigned char)*text)) text++;
+    if (*text == '\0') return text;
+    char *end = text + strlen(text) - 1;
+    while (end > text && isspace((unsigned char)*end)) { *end = '\0'; end--; }
+    return text;
 }
 
-void task51_cmd_input(void *pvParameters) {
+// Reject lines containing characters outside A-Z, 0-9, space
+// (filters serial noise / garbage bytes)
+static bool is_charset_valid(const char *text) {
+    for (int i = 0; text[i] != '\0'; i++) {
+        char ch = text[i];
+        if (!((ch >= 'A' && ch <= 'Z') ||
+              (ch >= '0' && ch <= '9') ||
+               ch == ' ')) return false;
+    }
+    return true;
+}
+
+// Parse "PWM <value>" — returns true and sets *out on success
+static bool parse_pwm_value(const char *s, int *out) {
+    char *endptr = NULL;
+    long v = strtol(s, &endptr, 10);
+    if (endptr == s || *endptr != '\0') return false;
+    if (v < ANALOG_PWM_MIN || v > ANALOG_PWM_MAX) return false;
+    *out = (int)v;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Parse and apply one complete command line
+// ---------------------------------------------------------------------------
+static void apply_command(const char *raw_line) {
+    char buf[LINE_BUF_LEN] = {0};
+    strncpy(buf, raw_line, sizeof(buf) - 1);
+    char *line = trim_whitespace(buf);
+    if (*line == '\0') return;
+    str_to_upper(line);
+    if (!is_charset_valid(line)) return;   // silently drop noise
+
+    if (strcmp(line, "ON") == 0) {
+        if (xSemaphoreTake(s_cmd_mutex, MTX_TIMEOUT) == pdTRUE) {
+            s_cmd.bin_requested = true;
+            xSemaphoreGive(s_cmd_mutex);
+        }
+        printf("CMD OK: BIN=ON\n");
+        return;
+    }
+
+    if (strcmp(line, "OFF") == 0) {
+        if (xSemaphoreTake(s_cmd_mutex, MTX_TIMEOUT) == pdTRUE) {
+            s_cmd.bin_requested = false;
+            xSemaphoreGive(s_cmd_mutex);
+        }
+        printf("CMD OK: BIN=OFF\n");
+        return;
+    }
+
+    if (strcmp(line, "AUTO") == 0) {
+        if (xSemaphoreTake(s_cmd_mutex, MTX_TIMEOUT) == pdTRUE) {
+            s_cmd.analog_mode = ANALOG_MODE_AUTO;
+            xSemaphoreGive(s_cmd_mutex);
+        }
+        printf("CMD OK: ANALOG=AUTO\n");
+        return;
+    }
+
+    if (strncmp(line, "PWM ", 4) == 0) {
+        int pwm = 0;
+        if (!parse_pwm_value(line + 4, &pwm)) {
+            printf("CMD ERR: PWM must be %d..%d\n", ANALOG_PWM_MIN, ANALOG_PWM_MAX);
+            return;
+        }
+        if (xSemaphoreTake(s_cmd_mutex, MTX_TIMEOUT) == pdTRUE) {
+            s_cmd.analog_mode = ANALOG_MODE_MANUAL;
+            s_cmd.manual_pwm  = pwm;
+            xSemaphoreGive(s_cmd_mutex);
+        }
+        printf("CMD OK: ANALOG=MANUAL PWM=%d\n", pwm);
+        return;
+    }
+
+    if (strcmp(line, "HELP") == 0) {
+        printf("Commands: ON | OFF | AUTO | PWM <0..255>\n");
+        return;
+    }
+
+    printf("CMD ERR: Unknown command. Use HELP\n");
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+void task51_task1_init() {
+    s_cmd_mutex = xSemaphoreCreateMutex();
+}
+
+App5UserCmd_t task51_task1_get_latest() {
+    App5UserCmd_t snap = { false, ANALOG_MODE_AUTO, 0 };
+    if (xSemaphoreTake(s_cmd_mutex, MTX_TIMEOUT) == pdTRUE) {
+        snap = s_cmd;
+        xSemaphoreGive(s_cmd_mutex);
+    }
+    return snap;
+}
+
+// ---------------------------------------------------------------------------
+// Task body
+// ---------------------------------------------------------------------------
+void task51_task1(void *pvParameters) {
     (void) pvParameters;
+
+    char    line_buf[LINE_BUF_LEN] = {0};
+    int     line_len = 0;
+
+    printf("Lab 5.1 ready. Use: ON | OFF | AUTO | PWM <0..255> | HELP\n");
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for (;;) {
-        int  new_cmd     = -1;
-        bool new_invalid = false;
-
-        // ------------------------------------------------------------------
-        // Non-blocking Serial read – accumulate chars into s_buf each tick.
-        // When '\n' is received the line is parsed as a command.
-        // ------------------------------------------------------------------
         while (Serial.available() > 0) {
             char ch = (char)Serial.read();
 
-            if (ch == '\r') continue;  // ignore CR (Windows line endings)
+            if (ch == '\r' || ch == '\n') {
+                line_buf[line_len] = '\0';
+                if (line_len > 0) {
+                    apply_command(line_buf);
+                }
+                line_len = 0;
+                line_buf[0] = '\0';
+                continue;
+            }
 
-            if (ch == '\n') {
-                s_buf[s_len] = '\0';
-                if (s_len > 0) {
-                    new_cmd = parse_cmd(s_buf, &new_invalid);
-                }
-                s_len = 0;
-                break;  // process one command per tick
-            } else {
-                if (s_len < CMD_BUF_LEN - 1) {
-                    s_buf[s_len++] = ch;
-                }
-                // Buffer overflow: silently discard extra chars
+            if (line_len < (int)sizeof(line_buf) - 1) {
+                line_buf[line_len++] = ch;
             }
         }
 
-        // ------------------------------------------------------------------
-        // Publish to shared state (only when something actually arrived)
-        // ------------------------------------------------------------------
-        if (new_cmd != -1 || new_invalid) {
-            if (xSemaphoreTake(g51_cmd_mutex, portMAX_DELAY) == pdTRUE) {
-                g51_cmd.raw_cmd     = new_cmd;
-                g51_cmd.source      = CMD_SRC_SERIAL;
-                g51_cmd.invalid_cmd = new_invalid;
-                xSemaphoreGive(g51_cmd_mutex);
-            }
-        }
-
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(50));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(ACTUATOR_CMD_PERIOD_MS));
     }
 }
