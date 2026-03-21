@@ -3,19 +3,23 @@
 
 #include "task_config.h"
 
-// Task 2 – Signal Conditioning  (50 ms, priority 2)
+// Task 2 – Signal Conditioning + Actuator Control
 //
-// Reads g51_cmd (from task_1) and applies:
-//   1. Saturation  – clamp raw_cmd to valid binary set {0, 1}
-//   2. Debounce    – require BIN_DEBOUNCE_SAMPLES consecutive identical
-//                    samples before committing a state change
+// Period  : ACTUATOR_COND_PERIOD_MS = 25 ms (vTaskDelayUntil)
+// Priority: 2
 //
-// Writes g51_bin.committed (protected by g51_bin_mutex).
-// task51_binary_ctrl then reads committed to drive the pin.
+// Each cycle:
+//   1. Reads potentiometer via dd_sns_angle_loop()
+//   2. Reads latest command from task51_task1_get_latest()
+//   3. Applies binary actuator (debounce via act_binary)
+//   4. Applies analog actuator (AUTO=pot level, MANUAL=PWM command)
+//   5. Computes analog alert with hysteresis
+//   6. Writes App5Snapshot_t under g_app5_snapshot_mutex (single lock)
+//   7. Updates LED indicators via digitalWrite
 //
-// Owns g51_cmd, g51_bin and their mutexes (defined in task_2.cpp).
+// Owns g_app5_snapshot, g_app5_snapshot_mutex (defined in task_2.cpp).
 // Call task51_init() before starting the scheduler.
 
-void task51_signal_cond(void *pvParameters);
+void task51_conditioning(void *pvParameters);
 
 #endif // APP_LAB_5_1_TASK_2_H

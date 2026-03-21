@@ -1,87 +1,121 @@
 #include "task_2.h"
+#include "task_1.h"
 #include "task_config.h"
+#include "act_binary/act_binary.h"
+#include "act_analog/act_analog.h"
+#include "dd_sns_angle/dd_sns_angle.h"
 #include <Arduino_FreeRTOS.h>
 #include <semphr.h>
+#include <Arduino.h>
 
 // ===========================================================================
-// Shared state definitions (owned here, declared extern in task_config.h)
+// Shared snapshot – owned here, read by task_3 via g_app5_snapshot_mutex
 // ===========================================================================
-CmdState51_t      g51_cmd       = { -1, 0, false };
-SemaphoreHandle_t g51_cmd_mutex = NULL;
+App5Snapshot_t g_app5_snapshot = {
+    false, false, false,
+    ANALOG_MODE_AUTO,
+    0, 0, 0, false
+};
+SemaphoreHandle_t g_app5_snapshot_mutex = NULL;
 
-BinActState51_t   g51_bin       = { -1, -1, 0, 0, false, false };
-SemaphoreHandle_t g51_bin_mutex = NULL;
+#define MTX_TIMEOUT pdMS_TO_TICKS(10)
 
-AnlgActState51_t  g51_anlg      = { 0, 0, 0, 0, false, false, 0 };
-SemaphoreHandle_t g51_anlg_mutex = NULL;
-
-// ------------------------------------------------------------------
-// task51_init – called once from app_lab_5_1_setup()
-// ------------------------------------------------------------------
 void task51_init() {
-    g51_cmd_mutex  = xSemaphoreCreateMutex();
-    g51_bin_mutex  = xSemaphoreCreateMutex();
-    g51_anlg_mutex = xSemaphoreCreateMutex();
+    g_app5_snapshot_mutex = xSemaphoreCreateMutex();
+}
+
+// ---------------------------------------------------------------------------
+// Map potentiometer angle (-135..+135 deg) to PWM (0..255)
+// ---------------------------------------------------------------------------
+static int map_angle_to_pwm(int angle_deg) {
+    int pwm = (int)map((long)angle_deg, -135, 135, ANALOG_PWM_MIN, ANALOG_PWM_MAX);
+    if (pwm < ANALOG_PWM_MIN) return ANALOG_PWM_MIN;
+    if (pwm > ANALOG_PWM_MAX) return ANALOG_PWM_MAX;
+    return pwm;
 }
 
 // ===========================================================================
-// Task 2 – Signal Conditioning  (50 ms period, priority 2)
+// Task 2 – Signal Conditioning + Actuator Control  (25 ms, priority 2)
 //
-// Binary actuator pipeline:
-//   raw_cmd  →  saturation (clamp to {0,1})  →  debounce
-//           →  g51_bin.committed  (read by task51_binary_ctrl)
-//
-// Saturation: any value outside {0,1} is discarded (treated as -1/none).
-// Debounce  : the candidate value must arrive BIN_DEBOUNCE_SAMPLES times
-//             in a row before it becomes the committed state.
+// Each cycle:
+//   1. Reads potentiometer angle via dd_sns_angle
+//   2. Gets latest user command from task51_task1_get_latest()
+//   3. Applies binary actuator (debounce in act_binary_tick)
+//   4. Computes PWM from AUTO (pot) or MANUAL (command) mode
+//   5. Applies analog actuator (L298N via act_analog_tick)
+//   6. Evaluates analog alert with hysteresis
+//   7. Writes all state into App5Snapshot_t under one mutex lock
+//   8. Updates LED indicators via direct digitalWrite
 // ===========================================================================
-void task51_signal_cond(void *pvParameters) {
+void task51_conditioning(void *pvParameters) {
     (void) pvParameters;
 
-    // Small offset so task_1 always runs first each cycle
-    vTaskDelay(pdMS_TO_TICKS(5));
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for (;;) {
-        // --- 1. Snapshot the latest command from task_1 -------------------
-        int raw_cmd = -1;
+        // --- 1. Read potentiometer ----------------------------------------
+        dd_sns_angle_loop();
+        int angle_deg = dd_sns_angle_get_value();   // -135..+135
 
-        if (xSemaphoreTake(g51_cmd_mutex, portMAX_DELAY) == pdTRUE) {
-            raw_cmd = g51_cmd.raw_cmd;
-            // Clear the command so we don't re-process it next tick
-            g51_cmd.raw_cmd     = -1;
-            g51_cmd.invalid_cmd = false;
-            xSemaphoreGive(g51_cmd_mutex);
+        // --- 2. Read latest user command from task_1 ----------------------
+        App5UserCmd_t cmd = task51_task1_get_latest();
+
+        // --- 3. Binary actuator: debounce + apply -------------------------
+        act_binary_request(cmd.bin_requested ? 1 : 0);
+        act_binary_tick();
+
+        // --- 4. Analog actuator: AUTO or MANUAL ---------------------------
+        int requested_pwm = 0;
+        if (cmd.analog_mode == ANALOG_MODE_AUTO) {
+            requested_pwm = map_angle_to_pwm(angle_deg);
+        } else {
+            requested_pwm = cmd.manual_pwm;
+        }
+        act_analog_tick(requested_pwm);
+        int applied_pwm = act_analog_get_pwm();
+
+        // --- 5. Analog alert with hysteresis (PWM domain) -----------------
+        bool analog_alert   = false;
+        bool previous_alert = false;
+
+        if (xSemaphoreTake(g_app5_snapshot_mutex, MTX_TIMEOUT) == pdTRUE) {
+            previous_alert = g_app5_snapshot.analog_alert;
+            xSemaphoreGive(g_app5_snapshot_mutex);
         }
 
-        // --- 2. Saturation: only 0 or 1 are valid ------------------------
-        // Values outside {0,1} are discarded (no state change)
-        int saturated = raw_cmd;
-        if (raw_cmd != 0 && raw_cmd != 1) {
-            saturated = -1;   // nothing to do
+        if (!previous_alert && applied_pwm > ANALOG_ALERT_HIGH) {
+            analog_alert = true;
+        } else if (previous_alert && applied_pwm >= ANALOG_ALERT_LOW) {
+            analog_alert = true;
         }
 
-        // --- 3. Debounce: require BIN_DEBOUNCE_SAMPLES consistent ticks --
-        if (saturated != -1) {
-            if (xSemaphoreTake(g51_bin_mutex, portMAX_DELAY) == pdTRUE) {
-                g51_bin.requested = saturated;
-
-                if (saturated == g51_bin.pending) {
-                    g51_bin.bounce_count++;
-                } else {
-                    g51_bin.pending      = saturated;
-                    g51_bin.bounce_count = 1;
-                }
-
-                if (g51_bin.bounce_count >= BIN_DEBOUNCE_SAMPLES) {
-                    g51_bin.committed    = g51_bin.pending;
-                    g51_bin.bounce_count = BIN_DEBOUNCE_SAMPLES; // cap
-                }
-
-                xSemaphoreGive(g51_bin_mutex);
-            }
+        // --- 6. Write snapshot (single lock, all fields at once) ----------
+        if (xSemaphoreTake(g_app5_snapshot_mutex, MTX_TIMEOUT) == pdTRUE) {
+            g_app5_snapshot.bin_requested        = cmd.bin_requested;
+            g_app5_snapshot.bin_pending          = (act_binary_get_pending() !=
+                                                    act_binary_get_state());
+            g_app5_snapshot.bin_state            = (act_binary_get_state() == 1);
+            g_app5_snapshot.analog_mode          = cmd.analog_mode;
+            g_app5_snapshot.angle_deg            = angle_deg;
+            g_app5_snapshot.analog_requested_pwm = requested_pwm;
+            g_app5_snapshot.analog_applied_pwm   = applied_pwm;
+            g_app5_snapshot.analog_alert         = analog_alert;
+            xSemaphoreGive(g_app5_snapshot_mutex);
         }
 
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(50));
+        // --- 7. LED indicators --------------------------------------------
+        //   PIN_LED_BIN_ON (9)  RED    = binary actuator ON
+        //   PIN_LED_OK     (12) GREEN  = no alert
+        //   PIN_LED_ALERT  (11) YELLOW = analog alert active
+        digitalWrite(PIN_LED_BIN_ON, (act_binary_get_state() == 1) ? HIGH : LOW);
+        if (analog_alert) {
+            digitalWrite(PIN_LED_OK,    LOW);
+            digitalWrite(PIN_LED_ALERT, HIGH);
+        } else {
+            digitalWrite(PIN_LED_OK,    HIGH);
+            digitalWrite(PIN_LED_ALERT, LOW);
+        }
+
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(ACTUATOR_COND_PERIOD_MS));
     }
 }
