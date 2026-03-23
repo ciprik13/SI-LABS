@@ -3,6 +3,7 @@
 #include "srv_serial_stdio/srv_serial_stdio.h"
 #include <Arduino_FreeRTOS.h>
 #include <semphr.h>
+#include <Arduino.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -78,19 +79,6 @@ static bool pass_charset(const char *buf, uint8_t len) {
 }
 
 // ---------------------------------------------------------------------------
-// PWM argument decoder  ("123" → 123, range-checked)
-// ---------------------------------------------------------------------------
-static bool decode_level(const char *token, int *out) {
-    if (*token == '\0') return false;
-    char *stop = NULL;
-    long  v    = strtol(token, &stop, 10);
-    if (*stop != '\0') return false;
-    if (v < ANALOG_PWM_MIN || v > ANALOG_PWM_MAX) return false;
-    *out = (int)v;
-    return true;
-}
-
-// ---------------------------------------------------------------------------
 // Keyword handler table
 // Each entry: keyword string + handler function pointer.
 // The PWM entry is handled separately (needs numeric argument).
@@ -127,10 +115,13 @@ static void decode_line_from_buf(char *buf) {
     len = pass_trim(buf, len);
     if (len == 0 || !pass_charset(buf, len)) return;
 
-    // PWM command needs a numeric argument — handle before table lookup
-    if (strncmp(buf, "PWM ", 4) == 0) {
-        int level = 0;
-        if (!decode_level(buf + 4, &level)) {
+    // PWM command — use sscanf to extract the numeric argument
+    char pwm_keyword[8] = {0};
+    int  pwm_arg        = -1;
+    if (sscanf(buf, "%7s %d", pwm_keyword, &pwm_arg) == 2 &&
+        strcmp(pwm_keyword, "PWM") == 0) {
+        int level = pwm_arg;
+        if (level < ANALOG_PWM_MIN || level > ANALOG_PWM_MAX) {
             printf("CMD ERR: PWM must be %d..%d\n", ANALOG_PWM_MIN, ANALOG_PWM_MAX);
             return;
         }
@@ -177,24 +168,39 @@ App5UserCmd_t input_handler_get_cmd() {
 
 // ---------------------------------------------------------------------------
 // Task entry point
+//
+// Reading strategy:
+//   getchar() is safe here because it is called ONLY after Serial.available()
+//   confirms a byte is ready — srv_serial_get_char() will not busy-wait.
+//   Characters are accumulated into rx_line one getchar() call per byte.
+//   On newline the complete line is handed to sscanf for token extraction
+//   before decode_line_from_buf processes it.
 // ---------------------------------------------------------------------------
 void input_handler_run(void *pvParameters) {
     (void)pvParameters;
 
     char    rx_line[RX_LINE_MAX] = {0};
-    uint8_t rx_pos = 0;
+    uint8_t rx_pos               = 0;
 
     printf("Lab 5.1 ready. Use: ON | OFF | AUTO | PWM <0..255> | HELP\n");
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(ACTUATOR_CMD_PERIOD_MS));
 
-        // Drain all available bytes this tick — try_get_char never blocks
-        char ch;
-        while (srv_serial_stdio_try_get_char(&ch)) {
+        // Accumulate bytes with getchar() — safe because Serial.available()
+        // is checked first so the underlying get_char never busy-waits.
+        while (Serial.available() > 0) {
+            char ch = (char)getchar();
+
             if (ch == '\r' || ch == '\n') {
                 if (rx_pos > 0) {
                     rx_line[rx_pos] = '\0';
+
+                    // Use sscanf to extract the first token for dispatch.
+                    // For PWM the numeric argument is parsed separately.
+                    char token[RX_LINE_MAX] = {0};
+                    sscanf(rx_line, " %39s", token);
+
                     decode_line_from_buf(rx_line);
                     rx_pos = 0;
                 }
