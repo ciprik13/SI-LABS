@@ -15,6 +15,18 @@ int srv_serial_get_char(FILE *f)
     return Serial.read();
 }
 
+int srv_serial_stdio_try_get_char(char *out_ch)
+{
+    if (out_ch == NULL)
+        return 0;
+
+    if (!Serial.available())
+        return 0;
+
+    *out_ch = (char)Serial.read();
+    return 1;
+}
+
 void srv_serial_stdio_setup()
 {
     Serial.begin(9600);

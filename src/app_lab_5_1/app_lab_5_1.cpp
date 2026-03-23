@@ -8,6 +8,7 @@
 #include "srv_serial_stdio/srv_serial_stdio.h"
 #include "srv_stdio_lcd/srv_stdio_lcd.h"
 #include "dd_sns_angle/dd_sns_angle.h"
+#include "dd_led/dd_led.h"
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
@@ -41,10 +42,11 @@ void app_lab_5_1_setup() {
     // Analog actuator — L298N motor driver
     act_analog_init(PIN_MOTOR_ENA, PIN_MOTOR_IN1, PIN_MOTOR_IN2);
 
-    // Status LEDs — direct GPIO (not via dd_led driver)
-    pinMode(PIN_LED_BIN_ON, OUTPUT);  digitalWrite(PIN_LED_BIN_ON, LOW);
-    pinMode(PIN_LED_OK,     OUTPUT);  digitalWrite(PIN_LED_OK,     HIGH);
-    pinMode(PIN_LED_ALERT,  OUTPUT);  digitalWrite(PIN_LED_ALERT,  LOW);
+    // Status LEDs via dd_led driver, remapped for this lab variant.
+    dd_led_setup_with_pins(PIN_LED_BIN_ON, PIN_LED_OK, PIN_LED_ALERT);
+    dd_led_turn_off();    // red
+    dd_led_1_turn_on();   // green
+    dd_led_2_turn_off();  // yellow
 
     task51_task1_init();   // creates task_1 internal mutex
     task51_init();         // creates g_app5_snapshot_mutex

@@ -8,6 +8,7 @@
 #define LED_YELLOW_PIN  11
 
 void dd_led_setup();
+void dd_led_setup_with_pins(uint8_t red_pin, uint8_t green_pin, uint8_t yellow_pin);
 
 void dd_led_set_target(int val);
 void dd_led_1_set_target(int val);

@@ -1,5 +1,6 @@
 #include "task_1.h"
 #include "task_config.h"
+#include "srv_serial_stdio/srv_serial_stdio.h"
 #include <Arduino_FreeRTOS.h>
 #include <semphr.h>
 #include <Arduino.h>
@@ -157,8 +158,8 @@ void task51_task1(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     for (;;) {
-        while (Serial.available() > 0) {
-            char ch = (char)Serial.read();
+        char ch = '\0';
+        while (srv_serial_stdio_try_get_char(&ch)) {
 
             if (ch == '\r' || ch == '\n') {
                 line_buf[line_len] = '\0';

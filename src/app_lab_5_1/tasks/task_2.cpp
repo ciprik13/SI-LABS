@@ -4,6 +4,7 @@
 #include "act_binary/act_binary.h"
 #include "act_analog/act_analog.h"
 #include "dd_sns_angle/dd_sns_angle.h"
+#include "dd_led/dd_led.h"
 #include <Arduino_FreeRTOS.h>
 #include <semphr.h>
 #include <Arduino.h>
@@ -103,17 +104,19 @@ void task51_conditioning(void *pvParameters) {
             xSemaphoreGive(g_app5_snapshot_mutex);
         }
 
-        // --- 7. LED indicators --------------------------------------------
-        //   PIN_LED_BIN_ON (9)  RED    = binary actuator ON
-        //   PIN_LED_OK     (12) GREEN  = no alert
-        //   PIN_LED_ALERT  (11) YELLOW = analog alert active
-        digitalWrite(PIN_LED_BIN_ON, (act_binary_get_state() == 1) ? HIGH : LOW);
+        // --- 7. LED indicators via dd_led ---------------------------------
+        //   red    = binary actuator ON
+        //   green  = no alert
+        //   yellow = analog alert active
+        if (act_binary_get_state() == 1) dd_led_turn_on();
+        else                             dd_led_turn_off();
+
         if (analog_alert) {
-            digitalWrite(PIN_LED_OK,    LOW);
-            digitalWrite(PIN_LED_ALERT, HIGH);
+            dd_led_1_turn_off();
+            dd_led_2_turn_on();
         } else {
-            digitalWrite(PIN_LED_OK,    HIGH);
-            digitalWrite(PIN_LED_ALERT, LOW);
+            dd_led_1_turn_on();
+            dd_led_2_turn_off();
         }
 
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(ACTUATOR_COND_PERIOD_MS));
