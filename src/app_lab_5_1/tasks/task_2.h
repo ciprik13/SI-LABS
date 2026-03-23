@@ -1,25 +1,34 @@
-#ifndef APP_LAB_5_1_TASK_2_H
-#define APP_LAB_5_1_TASK_2_H
+#ifndef ACTUATOR_CTRL_H
+#define ACTUATOR_CTRL_H
 
 #include "task_config.h"
 
-// Task 2 – Signal Conditioning + Actuator Control
+// ===========================================================================
+// actuator_ctrl – Signal conditioning and actuator drive loop  (Task 2)
 //
-// Period  : ACTUATOR_COND_PERIOD_MS = 25 ms (vTaskDelayUntil)
+// Period  : ACTUATOR_COND_PERIOD_MS = 25 ms
 // Priority: 2
 //
-// Each cycle:
-//   1. Reads potentiometer via dd_sns_angle_loop()
-//   2. Reads latest command from task51_task1_get_latest()
-//   3. Applies binary actuator (debounce via act_binary)
-//   4. Applies analog actuator (AUTO=pot level, MANUAL=PWM command)
-//   5. Computes analog alert with hysteresis
-//   6. Writes App5Snapshot_t under g_app5_snapshot_mutex (single lock)
-//   7. Updates LED indicators via digitalWrite
+// Each cycle the task:
+//   - samples the potentiometer
+//   - fetches the current user intent from input_handler
+//   - drives the binary actuator through its debounce layer
+//   - selects a PWM target (pot-mapped or fixed) and drives the motor
+//   - updates the over-speed alert using two-threshold hysteresis
+//   - publishes a complete system snapshot for the display task
+//   - reflects binary and alert states on the three status LEDs
 //
-// Owns g_app5_snapshot, g_app5_snapshot_mutex (defined in task_2.cpp).
-// Call task51_init() before starting the scheduler.
+// The alert state is maintained as persistent module-level state so it
+// does NOT need to be read back from the shared snapshot each cycle.
+//
+// Owns g_app5_snapshot and g_app5_snapshot_mutex (defined in task_2.cpp).
+//
+// Lifecycle:
+//   actuator_ctrl_setup()  – call once before vTaskStartScheduler
+//   actuator_ctrl_run()    – FreeRTOS task entry point
+// ===========================================================================
 
-void task51_conditioning(void *pvParameters);
+void actuator_ctrl_setup();
+void actuator_ctrl_run(void *pvParameters);
 
-#endif // APP_LAB_5_1_TASK_2_H
+#endif // ACTUATOR_CTRL_H

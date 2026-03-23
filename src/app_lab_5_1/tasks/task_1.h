@@ -1,28 +1,35 @@
-#ifndef APP_LAB_5_1_TASK_1_H
-#define APP_LAB_5_1_TASK_1_H
+#ifndef INPUT_HANDLER_H
+#define INPUT_HANDLER_H
 
 #include "task_config.h"
 
-// Task 1 – Command Input
+// ===========================================================================
+// input_handler – Serial line receiver and command decoder  (Task 1)
 //
-// Period  : ACTUATOR_CMD_PERIOD_MS = 20 ms (vTaskDelayUntil)
-// Priority: 3 (highest)
+// Period  : ACTUATOR_CMD_PERIOD_MS = 20 ms
+// Priority: 3
 //
-// Reads Serial line-by-line (non-blocking byte accumulation).
-// On complete line calls sscanf() — never blocks on incomplete token.
+// Each tick drains available Serial bytes into an internal line buffer.
+// When a newline is detected the accumulated line is decoded and the
+// internal actuator intent registers are updated atomically.
 //
-// Accepted commands (case-insensitive):
-//   ON              → bin_requested = true
-//   OFF             → bin_requested = false
-//   AUTO            → analog_mode = AUTO
-//   PWM <0..255>    → analog_mode = MANUAL, manual_pwm = value
-//   HELP            → prints command list
-//   other           → prints "CMD ERR: Unknown command"
+// Accepted input (case-insensitive, leading/trailing whitespace ignored):
+//   ON            – engage binary actuator
+//   OFF           – disengage binary actuator
+//   AUTO          – analog level tracks potentiometer
+//   PWM <0..255>  – analog level fixed to given value
+//   HELP          – print usage reminder
 //
-// Exposes: task51_task1_init(), task51_task1_get_latest()
+// Thread-safe read:
+//   input_handler_get_cmd()  – returns assembled App5UserCmd_t snapshot
+//
+// Lifecycle:
+//   input_handler_setup()    – call once before vTaskStartScheduler
+//   input_handler_run()      – FreeRTOS task entry point
+// ===========================================================================
 
-void task51_task1_init();
-App5UserCmd_t task51_task1_get_latest();
-void task51_task1(void *pvParameters);
+void          input_handler_setup();
+App5UserCmd_t input_handler_get_cmd();
+void          input_handler_run(void *pvParameters);
 
-#endif // APP_LAB_5_1_TASK_1_H
+#endif // INPUT_HANDLER_H

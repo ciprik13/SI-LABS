@@ -12,50 +12,25 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
-// ===========================================================================
-// Application entry point – Lab 5.1  (Variant C – Binary + Analog Actuator)
-//
-// Hardware:
-//   Binary actuator : Relay on pin 13 (act_binary) – ON/OFF via Serial
-//   Analog actuator : L298N motor driver
-//                     ENA=10 (PWM), IN1=8, IN2=7
-//   Potentiometer   : A0 → dd_sns_angle → AUTO mode analog level
-//   LCD 16×2 I2C    : SDA=20, SCL=21, addr=0x3F
-//   Status LEDs     : PIN_LED_BIN_ON=9  (RED)    – binary actuator ON
-//                     PIN_LED_OK=12     (GREEN)  – no alert
-//                     PIN_LED_ALERT=11  (YELLOW) – analog alert >ANALOG_ALERT_HIGH
-//
-// FreeRTOS tasks:
-//   task51_task1       – 20 ms,  priority 3  (Serial command input)
-//   task51_conditioning– 25 ms,  priority 2  (actuator control + snapshot)
-//   task51_display     – 500 ms, priority 1  (LCD + Serial report)
-// ===========================================================================
-
 void app_lab_5_1_setup() {
-    srv_serial_stdio_setup();    // Serial 9600 baud + printf redirect
-    srv_stdio_lcd_setup();       // LCD 16×2 I2C stdout tee (addr 0x3F)
-    dd_sns_angle_setup();        // potentiometer on A0 + mutex
+    srv_serial_stdio_setup();
+    srv_stdio_lcd_setup();
+    dd_sns_angle_setup();
 
-    // Binary actuator — LED on pin 9 (mirrors motor ON state)
-    act_binary_init(13);   // pin 13 = relay module IN
-
-    // Analog actuator — L298N motor driver
+    act_binary_init(13);
     act_analog_init(PIN_MOTOR_ENA, PIN_MOTOR_IN1, PIN_MOTOR_IN2);
 
-    // Status LEDs via dd_led driver, remapped for this lab variant.
     dd_led_setup_with_pins(PIN_LED_BIN_ON, PIN_LED_OK, PIN_LED_ALERT);
-    dd_led_turn_off();    // red
-    dd_led_1_turn_on();   // green
-    dd_led_2_turn_off();  // yellow
+    dd_led_turn_off();
+    dd_led_1_turn_on();
+    dd_led_2_turn_off();
 
-    task51_task1_init();   // creates task_1 internal mutex
-    task51_init();         // creates g_app5_snapshot_mutex
+    input_handler_setup();
+    actuator_ctrl_setup();
 
-    xTaskCreate(task51_task1,        "Task1_51", 512, NULL, 3, NULL);
-    xTaskCreate(task51_conditioning, "Task2_51", 512, NULL, 2, NULL);
-    xTaskCreate(task51_display,      "Task3_51", 768, NULL, 1, NULL);
+    xTaskCreate(input_handler_run,   "CmdInput",  512, NULL, 3, NULL);
+    xTaskCreate(actuator_ctrl_run,   "ActCtrl",   512, NULL, 2, NULL);
+    xTaskCreate(display_reporter_run,"Display",   768, NULL, 1, NULL);
 }
 
-void app_lab_5_1_loop() {
-    // FreeRTOS scheduler takes over; loop intentionally empty.
-}
+void app_lab_5_1_loop() {}

@@ -1,17 +1,36 @@
-#ifndef APP_LAB_5_1_TASK_3_H
-#define APP_LAB_5_1_TASK_3_H
+#ifndef DISPLAY_REPORTER_H
+#define DISPLAY_REPORTER_H
 
-// Task 3 – Display & Reporting
+// ===========================================================================
+// display_reporter – LCD and Serial output task  (Task 3)
 //
-// Period  : ACTUATOR_REPORT_PERIOD_MS = 500 ms (vTaskDelay)
+// Period  : ACTUATOR_REPORT_PERIOD_MS = 500 ms
 // Priority: 1 (lowest)
 //
-// LCD 16×2 (updated every tick):
-//   Row 0: "B: ON C: ON PD"  (binary state / requested / pending)
-//   Row 1: "A: 180 AU AL"    (applied PWM / mode / alert)
+// Every tick:
+//   - reads the shared snapshot
+//   - refreshes both LCD rows unconditionally
+//   - prints a Serial report only when content changed or heartbeat elapsed
 //
-// Serial: printed only when snapshot changed OR heartbeat (10 s) due.
+// Change detection uses a 32-bit FNV-1a hash over the snapshot fields
+// instead of field-by-field comparison.
+//
+// LCD layout (16 chars per row):
+//   Row 0:  "RLY:ON  MOT:178 "
+//   Row 1:  "ALT:OK  ANG:+45d"
+//
+// Serial block format:
+//   [T=<ms>ms] Lab 5.1 ================
+//    RELAY  : [ON ] debounce:STB
+//    MOTOR  : PWM=178/255 [======    ]
+//             mode:AUTO  angle: +45deg
+//             req:178  applied:178
+//    ALERT  : [OK]         HI=220 LO=200
+//   =================================
+//
+// Entry point:  display_reporter_run()
+// ===========================================================================
 
-void task51_display(void *pvParameters);
+void display_reporter_run(void *pvParameters);
 
-#endif // APP_LAB_5_1_TASK_3_H
+#endif // DISPLAY_REPORTER_H
