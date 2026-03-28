@@ -1,125 +1,80 @@
 {
   "version": 1,
-  "author": "Lab 5.1",
+  "author": "Lab 5.2 – Dual Actuator + Potentiometer",
   "editor": "wokwi",
   "parts": [
     {
       "type": "wokwi-arduino-mega",
       "id": "mega",
-      "top": -16,
-      "left": 78,
-      "attrs": {}
-    },
-    {
-      "type": "wokwi-breadboard",
-      "id": "bb",
-      "top": 360,
-      "left": -8,
-      "attrs": {}
-    },
-    {
-      "type": "wokwi-potentiometer",
-      "id": "pot_angle",
-      "top": 114,
-      "left": 520,
-      "attrs": {}
-    },
-    {
-      "type": "wokwi-lcd1602",
-      "id": "lcd1",
-      "top": 250,
-      "left": 504,
-      "attrs": {
-        "pins": "i2c",
-        "i2cAddress": "0x3F"
-      }
-    },
-    {
-      "type": "wokwi-relay-module",
-      "id": "relay1",
-      "top": 392,
-      "left": 440,
-      "attrs": {}
-    },
-    {
-      "type": "wokwi-text",
-      "id": "motor_note",
-      "top": 380,
-      "left": 620,
-      "attrs": {
-        "text": "External L298N + DC Motor\nENA -> D10 (PWM)\nIN1 -> D8\nIN2 -> D7\n5V + GND common"
-      }
-    },
-    {
-      "type": "wokwi-resistor",
-      "id": "r_ok",
       "top": 200,
-      "left": -150,
-      "attrs": { "value": "220" }
+      "left": 0,
+      "attrs": {}
     },
-    {
-      "type": "wokwi-led",
-      "id": "led_ok",
-      "top": 200,
-      "left": -80,
-      "attrs": { "color": "green" }
-    },
-    {
-      "type": "wokwi-resistor",
-      "id": "r_alert",
-      "top": 240,
-      "left": -150,
-      "attrs": { "value": "220" }
-    },
-    {
-      "type": "wokwi-led",
-      "id": "led_alert",
-      "top": 240,
-      "left": -80,
-      "attrs": { "color": "yellow" }
-    },
-    {
-      "type": "wokwi-resistor",
-      "id": "r_bin_state",
-      "top": 280,
-      "left": -150,
-      "attrs": { "value": "220" }
-    },
-    {
-      "type": "wokwi-led",
-      "id": "led_bin_state",
-      "top": 280,
-      "left": -80,
-      "attrs": { "color": "red" }
-    }
+
+    { "type": "wokwi-lcd1602", "id": "lcd",
+      "top": 0, "left": 300,
+      "attrs": { "pins": "i2c", "address": "0x27" } },
+
+    { "type": "wokwi-potentiometer", "id": "pot",
+      "top": 0, "left": 560,
+      "attrs": { "value": "0" } },
+
+    { "type": "wokwi-resistor", "id": "r_red",    "top": 80,  "left": 540, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r_green",  "top": 120, "left": 540, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r_yellow", "top": 160, "left": 540, "attrs": { "value": "220" } },
+
+    { "type": "wokwi-led", "id": "led_red",    "top": 80,  "left": 620, "attrs": { "color": "red"    } },
+    { "type": "wokwi-led", "id": "led_green",  "top": 120, "left": 620, "attrs": { "color": "green"  } },
+    { "type": "wokwi-led", "id": "led_yellow", "top": 160, "left": 620, "attrs": { "color": "yellow" } },
+
+    { "type": "wokwi-relay-module", "id": "relay",
+      "top": 260, "left": 540, "attrs": {} },
+
+    { "type": "wokwi-l298n", "id": "l298n",
+      "top": 360, "left": 520, "attrs": {} },
+
+    { "type": "wokwi-dc-motor", "id": "motor",
+      "top": 480, "left": 560, "attrs": { "rpm": "200" } }
   ],
   "connections": [
-    ["mega:5V",    "bb:bp.1",       "red",   ["v248", "h-88"]],
-    ["mega:GND.2", "bb:bn.1",       "black", ["v254", "h-88"]],
+    ["mega:GND.1", "mega:GND.2", "black", []],
 
-    ["mega:A0",    "pot_angle:SIG", "green", ["v20",  "h278"]],
-    ["bb:bp.24",   "pot_angle:VCC", "red",   ["h252", "v-280"]],
-    ["bb:bn.24",   "pot_angle:GND", "black", ["h252", "v-268"]],
+    ["mega:20",    "lcd:SDA",    "green",  []],
+    ["mega:21",    "lcd:SCL",    "yellow", []],
+    ["mega:5V",    "lcd:VCC",    "red",    []],
+    ["mega:GND.1", "lcd:GND",    "black",  []],
 
-    ["mega:20",    "lcd1:SDA",      "blue",  ["v72",  "h352"]],
-    ["mega:21",    "lcd1:SCL",      "white", ["v78",  "h340"]],
-    ["bb:bp.30",   "lcd1:VCC",      "red",   ["h310", "v-172"]],
-    ["bb:bn.30",   "lcd1:GND",      "black", ["h310", "v-156"]],
+    ["pot:VCC",    "mega:5V",    "red",    []],
+    ["pot:GND",    "mega:GND.1", "black",  []],
+    ["pot:SIG",    "mega:A0",    "orange", []],
 
-    ["mega:13",    "relay1:IN",     "red",   ["v184", "h454"]],
-    ["bb:bp.26",   "relay1:VCC",    "red",   ["h355", "v-36"]],
-    ["bb:bn.26",   "relay1:GND",    "black", ["h355", "v-20"]],
+    ["mega:9",      "r_red:1",     "red",    []],
+    ["r_red:2",     "led_red:A",   "red",    []],
+    ["led_red:C",   "mega:GND.1",  "black",  []],
 
-    ["mega:12",    "r_ok:1",        "green",  ["h0"]],
-    ["r_ok:2",     "led_ok:A",      "green",  ["h0"]],
-    ["led_ok:C",   "mega:GND.1",    "black",  ["h0"]],
+    ["mega:12",     "r_green:1",   "green",  []],
+    ["r_green:2",   "led_green:A", "green",  []],
+    ["led_green:C", "mega:GND.1",  "black",  []],
 
-    ["mega:11",    "r_alert:1",     "yellow", ["h0"]],
-    ["r_alert:2",  "led_alert:A",   "yellow", ["h0"]],
-    ["led_alert:C","mega:GND.1",    "black",  ["h0"]],
+    ["mega:11",     "r_yellow:1",   "yellow", []],
+    ["r_yellow:2",  "led_yellow:A", "yellow", []],
+    ["led_yellow:C","mega:GND.1",   "black",  []],
 
-    ["mega:9",     "r_bin_state:1", "red",    ["h0"]],
-    ["r_bin_state:2","led_bin_state:A","red", ["h0"]],
-    ["led_bin_state:C","mega:GND.1","black",  ["h0"]]
-  ]
+    ["mega:13",    "relay:IN",    "orange", []],
+    ["mega:5V",    "relay:VCC",   "red",    []],
+    ["mega:GND.1", "relay:GND",   "black",  []],
+
+    ["mega:10",    "l298n:ENA",      "purple", []],
+    ["mega:8",     "l298n:IN1",      "blue",   []],
+    ["mega:7",     "l298n:IN2",      "blue",   []],
+    ["mega:5V",    "l298n:5V",       "red",    []],
+    ["mega:GND.1", "l298n:GND",      "black",  []],
+
+    ["l298n:MOTOR_A1", "motor:1",  "orange", []],
+    ["l298n:MOTOR_A2", "motor:2",  "orange", []]
+  ],
+  "serialMonitor": {
+    "display": "terminal",
+    "newline": "lf"
+  }
 }
