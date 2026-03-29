@@ -1,5 +1,6 @@
 #include "srv_serial_stdio.h"
 #include "Arduino.h"
+#include <Arduino_FreeRTOS.h>
 
 #include <stdio.h>
 
@@ -10,8 +11,10 @@ int srv_serial_put_char(char ch, FILE *f)
 
 int srv_serial_get_char(FILE *f)
 {
-    while (!Serial.available())
-        ;
+    while (!Serial.available()) {
+        // Keep scanf/getchar compatible while allowing other tasks to run.
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
     return Serial.read();
 }
 
