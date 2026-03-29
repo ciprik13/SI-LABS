@@ -120,12 +120,12 @@ static void kw_dec() {
 }
 
 static void kw_help() {
-    print_locked("\rCommands:\n"
-                 "  ON | OFF          - relay on/off\n"
-                 "  AUTO              - motor speed tracks potentiometer\n"
-                 "  PWM <0..255>      - motor speed manual\n"
-                 "  INC | DEC         - step speed +/-%d (MANUAL mode only)\n"
-                 "  HELP              - this message\n",
+    print_locked("\r\nCommands:\r\n"
+                 "  ON | OFF          - relay on/off\r\n"
+                 "  AUTO              - motor speed tracks potentiometer\r\n"
+                 "  PWM <0..255>      - motor speed manual\r\n"
+                 "  INC | DEC         - step speed +/-%d (MANUAL mode only)\r\n"
+                 "  HELP              - this message\r\n",
                  SPEED_STEP);
 }
 
@@ -207,44 +207,28 @@ void task1_run(void *pvParameters) {
 }
 
 // ---------------------------------------------------------------------------
-// parse_and_execute_line – Manual parsing mimicking scanf behavior
+// parse_and_execute_line – sscanf-based parsing (STDIO style, non-blocking)
 // Parses: KEYWORD [ARG]
 // Example: "PWM 210" or "ON" or "HELP"
 // ---------------------------------------------------------------------------
 static void parse_and_execute_line(const char *line, int len) {
+    (void)len;
+
     char keyword[RX_LINE_MAX] = {0};
-    int  kw_idx = 0;
-    int  i = 0;
+    int  val = 0;
 
-    // Skip leading whitespace
-    while (i < len && isspace((unsigned char)line[i])) i++;
-
-    // Read keyword (alphabetic characters only)
-    while (i < len && isalpha((unsigned char)line[i]) && kw_idx < RX_LINE_MAX - 1) {
-        keyword[kw_idx++] = (char)toupper((unsigned char)line[i]);
-        i++;
+    // Read command keyword and optional integer argument in one pass.
+    int parsed = sscanf(line, " %39s %d", keyword, &val);
+    if (parsed <= 0) {
+        return;
     }
-    keyword[kw_idx] = '\0';
 
-    if (kw_idx == 0) return;  // Empty command
+    for (int i = 0; keyword[i] != '\0'; i++) {
+        keyword[i] = (char)toupper((unsigned char)keyword[i]);
+    }
 
-    // --- Handle commands ---
     if (strcmp(keyword, "PWM") == 0) {
-        // Expected: "PWM <number>"
-        // Skip whitespace after keyword
-        while (i < len && isspace((unsigned char)line[i])) i++;
-
-        // Parse integer
-        int val = 0;
-        int digit_count = 0;
-        while (i < len && isdigit((unsigned char)line[i]) && digit_count < 3) {
-            val = val * 10 + (line[i] - '0');
-            i++;
-            digit_count++;
-        }
-
-        // Validate PWM range
-        if (digit_count == 0) {
+        if (parsed < 2) {
             print_locked("\rCMD ERR: PWM requires a numeric value\n");
             return;
         }
@@ -254,7 +238,6 @@ static void parse_and_execute_line(const char *line, int len) {
             return;
         }
 
-        // Update PWM state
         if (xSemaphoreTake(s_mutex, SEM_TICKS) == pdTRUE) {
             s_mode       = ANALOG_MODE_MANUAL;
             s_pwm_manual = val;
