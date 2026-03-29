@@ -115,85 +115,109 @@ static void fill_bar(int pwm, char *buf) {
 //   MANUAL:    "MAN  [======]   "  (8-char bar inside brackets)
 // ---------------------------------------------------------------------------
 static void render_lcd(const App52DisplayVars_t *v) {
-    char row0[17], row1[17];
+    lcd.clear();
 
     // --- Row 0 ---
+    lcd.setCursor(0, 0);
+    lcd.print("RLY:");
+    lcd.print(v->relay_str);
     if (v->alert_on) {
-        snprintf(row0, sizeof(row0), "RLY:%-3s **ALERT*", v->relay_str);
+        lcd.print(" **ALERT*");
     } else if (v->at_max) {
-        snprintf(row0, sizeof(row0), "RLY:%-3s PWM: MAX", v->relay_str);
+        lcd.print(" PWM: MAX");
     } else if (v->at_min) {
-        snprintf(row0, sizeof(row0), "RLY:%-3s PWM:STOP", v->relay_str);
+        lcd.print(" PWM:STOP");
     } else {
-        snprintf(row0, sizeof(row0), "RLY:%-3s PWM: %3d", v->relay_str, v->pwm_rmp);
+        lcd.print(" PWM: ");
+        if (v->pwm_rmp < 100) lcd.print(' ');
+        if (v->pwm_rmp < 10)  lcd.print(' ');
+        lcd.print(v->pwm_rmp);
     }
 
     // --- Row 1 ---
+    lcd.setCursor(0, 1);
     if (v->is_auto) {
-        // AUTO POT:0512   (shows raw ADC value)
-        snprintf(row1, sizeof(row1), "AUTO POT:%4d   ", v->pot_raw);
+        lcd.print("AUTO POT:");
+        if (v->pot_raw < 1000) lcd.print(' ');
+        if (v->pot_raw < 100)  lcd.print(' ');
+        if (v->pot_raw < 10)   lcd.print(' ');
+        lcd.print(v->pot_raw);
+        lcd.print("   ");
     } else {
-        // MAN  [========]  (8-char bar)
-        int filled8 = (v->pwm_rmp * 8) / 255;
-        if (filled8 > 8) filled8 = 8;
-        char mini[11] = "[        ]";
-        for (int i = 0; i < filled8; i++) mini[1 + i] = '=';
-        snprintf(row1, sizeof(row1), "MAN  %-10s", mini);
-    }
+        int filled4 = (v->pwm_rmp * 4) / 255;
+        if (filled4 > 4) filled4 = 4;
+        if (filled4 < 0) filled4 = 0;
 
-    lcd.clear();
-    lcd.setCursor(0, 0); lcd.print(row0);
-    lcd.setCursor(0, 1); lcd.print(row1);
+        lcd.print("MAN PWM:");
+        if (v->pwm_rmp < 100) lcd.print(' ');
+        if (v->pwm_rmp < 10)  lcd.print(' ');
+        lcd.print(v->pwm_rmp);
+        lcd.print(' ');
+        lcd.print('[');
+        for (int i = 0; i < 4; i++) {
+            lcd.print((i < filled4) ? '=' : ' ');
+        }
+        lcd.print(']');
+    }
 }
 
 // ---------------------------------------------------------------------------
-// render_serial
+// render_serial – Print full status report while holding mutex
+// Use moderate timeout (50ms) to allow complete report while not blocking task_1
 // ---------------------------------------------------------------------------
 static void render_serial(const App52DisplayVars_t *v) {
     char bar[13];
     fill_bar(v->pwm_rmp, bar);
 
-    printf("\n[T=%lums] Lab 5.2 ================\n", v->uptime_ms);
+    // Use moderate timeout for the full report print (50ms)
+    TickType_t long_timeout = pdMS_TO_TICKS(50);
+    
+    if (g_app52_io_mutex != NULL) {
+        if (xSemaphoreTake(g_app52_io_mutex, long_timeout) != pdTRUE) return;
+    }
 
-    printf(" RELAY  : [%s] debounce:%s\n",
-           v->relay_str, v->dbnc_str);
+    printf("\r\n[T=%lums] Lab 5.2 ================\n", v->uptime_ms);
+    printf("\r RELAY  : [%s] debounce:%s\n", v->relay_str, v->dbnc_str);
 
     if (v->is_auto)
-        printf(" MODE   : AUTO    pot:%4d (map:%3d)\n",
-               v->pot_raw, v->pwm_raw);
+        printf("\r MODE   : AUTO    pot:%4d (map:%3d)\n", v->pot_raw, v->pwm_raw);
     else
-        printf(" MODE   : MANUAL  pwm_set:%3d\n", v->pwm_raw);
+        printf("\r MODE   : MANUAL  pwm_set:%3d\n", v->pwm_raw);
 
-    printf(" MOTOR  : raw:%3d sat:%3d med:%3d wgt:%3d\n",
+    printf("\r MOTOR  : raw:%3d sat:%3d med:%3d wgt:%3d\n",
            v->pwm_raw, v->pwm_sat, v->pwm_med, v->pwm_wgt);
-    printf("          ramp:%3d  applied:%3d/255\n",
-           v->pwm_rmp, v->pwm_rmp);
-    printf("          %s\n", bar);
+    printf("\r MOTOR  : ramp:%3d  applied:%3d/255\n", v->pwm_rmp, v->pwm_rmp);
+    printf("\r BAR    : %s\n", bar);
 
     if (v->alert_on)
-        printf(" ALERT  : [!!] OVER-SPEED ACTIVE  HI=%d LO=%d\n",
+        printf("\r ALERT  : [!!] OVER-SPEED ACTIVE  HI=%d LO=%d\n",
                ALERT_HIGH_PWM, ALERT_LOW_PWM);
     else
-        printf(" ALERT  : [OK]                    HI=%d LO=%d\n",
+        printf("\r ALERT  : [OK]                    HI=%d LO=%d\n",
                ALERT_HIGH_PWM, ALERT_LOW_PWM);
 
-    // Bonus limit advisory
     if (v->at_max)
-        printf(" LIMIT  : [MAX] PWM=255 - use DEC to reduce speed\n");
+        printf("\r LIMIT  : [MAX] PWM=255 - use DEC to reduce speed\n");
     else if (v->at_min)
-        printf(" LIMIT  : [MIN] PWM=0   - motor stopped\n");
+        printf("\r LIMIT  : [MIN] PWM=0   - motor stopped\n");
     else
-        printf(" LIMIT  : max:NO  min:NO\n");
+        printf("\r LIMIT  : max:NO  min:NO\n");
 
-    printf("====================================\n");
+    printf("\r====================================\n");
+
+    if (g_app52_io_mutex != NULL) {
+        xSemaphoreGive(g_app52_io_mutex);
+    }
 }
 
 // ---------------------------------------------------------------------------
 // fetch_snapshot
+// 
+// Silently fail if snapshot mutex times out (transient contention).
+// Task_3 will retry on next cycle (500ms later).
 // ---------------------------------------------------------------------------
 static bool fetch_snapshot(App52Snapshot_t *out) {
     if (xSemaphoreTake(g_app52_snapshot_mutex, SEM_TICKS) != pdTRUE) {
-        printf("[WARN] snapshot mutex timeout\n");
         return false;
     }
     *out = g_app52_snapshot;
@@ -206,6 +230,11 @@ static bool fetch_snapshot(App52Snapshot_t *out) {
 // ---------------------------------------------------------------------------
 void task3_run(void *pvParameters) {
     (void)pvParameters;
+
+    lcd.init();
+    lcd.backlight();
+    lcd.clear();
+    lcd.home();
 
     uint32_t   prev_hash      = 0;
     bool       have_prev      = false;
