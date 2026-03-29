@@ -37,7 +37,7 @@
 #define BIN_DEBOUNCE_SAMPLES       3    // 3 × 25 ms = 75 ms persistence
 
 // --- Hardware pins ----------------------------------------------------------
-#define PIN_RELAY         13    // Binary actuator – relay coil
+#define PIN_RELAY          6    // Binary actuator – relay coil
 #define PIN_LED_BIN_ON     9    // RED    – relay ON indicator
 #define PIN_LED_OK        12    // GREEN  – no alert
 #define PIN_LED_ALERT     11    // YELLOW – alert active
@@ -103,5 +103,6 @@ typedef struct {
 
 extern App52Snapshot_t   g_app52_snapshot;
 extern SemaphoreHandle_t g_app52_snapshot_mutex;
+extern SemaphoreHandle_t g_app52_io_mutex;
 
 #endif // APP_LAB_5_2_TASK_CONFIG_H
