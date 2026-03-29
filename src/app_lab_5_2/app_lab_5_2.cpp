@@ -11,6 +11,8 @@
 #include <Arduino.h>
 #include <Arduino_FreeRTOS.h>
 
+SemaphoreHandle_t g_app52_io_mutex = NULL;
+
 // ===========================================================================
 // app_lab_5_2 – Dual-actuator control  (Lab 5.2, Variant C)
 //
@@ -33,7 +35,7 @@
 
 void app_lab_5_2_setup() {
     srv_serial_stdio_setup();
-    srv_stdio_lcd_setup();
+    g_app52_io_mutex = xSemaphoreCreateMutex();
 
     // Binary actuator – relay (+ load LED via NO contact)
     act_binary_init(PIN_RELAY);
