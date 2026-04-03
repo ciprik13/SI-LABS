@@ -1,80 +1,248 @@
 {
   "version": 1,
-  "author": "Lab 5.2 – Dual Actuator + Potentiometer",
+  "author": "Lab 6.1 \u2013 ON-OFF Hysteresis Temperature Control (Variant A)",
   "editor": "wokwi",
   "parts": [
     {
       "type": "wokwi-arduino-mega",
       "id": "mega",
-      "top": 200,
+      "top": 220,
       "left": 0,
       "attrs": {}
     },
-
-    { "type": "wokwi-lcd1602", "id": "lcd",
-      "top": 0, "left": 300,
-      "attrs": { "pins": "i2c", "address": "0x27" } },
-
-    { "type": "wokwi-potentiometer", "id": "pot",
-      "top": 0, "left": 560,
-      "attrs": { "value": "0" } },
-
-    { "type": "wokwi-resistor", "id": "r_red",    "top": 80,  "left": 540, "attrs": { "value": "220" } },
-    { "type": "wokwi-resistor", "id": "r_green",  "top": 120, "left": 540, "attrs": { "value": "220" } },
-    { "type": "wokwi-resistor", "id": "r_yellow", "top": 160, "left": 540, "attrs": { "value": "220" } },
-
-    { "type": "wokwi-led", "id": "led_red",    "top": 80,  "left": 620, "attrs": { "color": "red"    } },
-    { "type": "wokwi-led", "id": "led_green",  "top": 120, "left": 620, "attrs": { "color": "green"  } },
-    { "type": "wokwi-led", "id": "led_yellow", "top": 160, "left": 620, "attrs": { "color": "yellow" } },
-
-    { "type": "wokwi-relay-module", "id": "relay",
-      "top": 260, "left": 540, "attrs": {} },
-
-    { "type": "wokwi-l298n", "id": "l298n",
-      "top": 360, "left": 520, "attrs": {} },
-
-    { "type": "wokwi-dc-motor", "id": "motor",
-      "top": 480, "left": 560, "attrs": { "rpm": "200" } }
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd",
+      "top": 0,
+      "left": 300,
+      "attrs": {
+        "pins": "i2c",
+        "address": "0x27"
+      }
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": 0,
+      "left": 560,
+      "attrs": {
+        "temperature": "23",
+        "humidity": "55"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_dht",
+      "top": 30,
+      "left": 556,
+      "attrs": {
+        "value": "10000"
+      }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay",
+      "top": 200,
+      "left": 540,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_red",
+      "top": 80,
+      "left": 700,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_green",
+      "top": 120,
+      "left": 700,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_yellow",
+      "top": 160,
+      "left": 700,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_red",
+      "top": 80,
+      "left": 780,
+      "attrs": {
+        "color": "red"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_green",
+      "top": 120,
+      "left": 780,
+      "attrs": {
+        "color": "green"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_yellow",
+      "top": 160,
+      "left": 780,
+      "attrs": {
+        "color": "yellow"
+      }
+    }
   ],
   "connections": [
-    ["mega:GND.1", "mega:GND.2", "black", []],
-
-    ["mega:20",    "lcd:SDA",    "green",  []],
-    ["mega:21",    "lcd:SCL",    "yellow", []],
-    ["mega:5V",    "lcd:VCC",    "red",    []],
-    ["mega:GND.1", "lcd:GND",    "black",  []],
-
-    ["pot:VCC",    "mega:5V",    "red",    []],
-    ["pot:GND",    "mega:GND.1", "black",  []],
-    ["pot:SIG",    "mega:A0",    "orange", []],
-
-    ["mega:9",      "r_red:1",     "red",    []],
-    ["r_red:2",     "led_red:A",   "red",    []],
-    ["led_red:C",   "mega:GND.1",  "black",  []],
-
-    ["mega:12",     "r_green:1",   "green",  []],
-    ["r_green:2",   "led_green:A", "green",  []],
-    ["led_green:C", "mega:GND.1",  "black",  []],
-
-    ["mega:11",     "r_yellow:1",   "yellow", []],
-    ["r_yellow:2",  "led_yellow:A", "yellow", []],
-    ["led_yellow:C","mega:GND.1",   "black",  []],
-
-    ["mega:13",    "relay:IN",    "orange", []],
-    ["mega:5V",    "relay:VCC",   "red",    []],
-    ["mega:GND.1", "relay:GND",   "black",  []],
-
-    ["mega:10",    "l298n:ENA",      "purple", []],
-    ["mega:8",     "l298n:IN1",      "blue",   []],
-    ["mega:7",     "l298n:IN2",      "blue",   []],
-    ["mega:5V",    "l298n:5V",       "red",    []],
-    ["mega:GND.1", "l298n:GND",      "black",  []],
-
-    ["l298n:MOTOR_A1", "motor:1",  "orange", []],
-    ["l298n:MOTOR_A2", "motor:2",  "orange", []]
+    [
+      "mega:GND.1",
+      "mega:GND.2",
+      "black",
+      []
+    ],
+    [
+      "mega:20",
+      "lcd:SDA",
+      "green",
+      []
+    ],
+    [
+      "mega:21",
+      "lcd:SCL",
+      "yellow",
+      []
+    ],
+    [
+      "mega:5V",
+      "lcd:VCC",
+      "red",
+      []
+    ],
+    [
+      "mega:GND.1",
+      "lcd:GND",
+      "black",
+      []
+    ],
+    [
+      "mega:2",
+      "dht:SDA",
+      "green",
+      []
+    ],
+    [
+      "mega:5V",
+      "dht:VCC",
+      "red",
+      []
+    ],
+    [
+      "mega:GND.1",
+      "dht:GND",
+      "black",
+      []
+    ],
+    [
+      "mega:5V",
+      "r_dht:1",
+      "red",
+      []
+    ],
+    [
+      "r_dht:2",
+      "dht:SDA",
+      "green",
+      []
+    ],
+    [
+      "mega:6",
+      "relay:IN",
+      "orange",
+      []
+    ],
+    [
+      "mega:5V",
+      "relay:VCC",
+      "red",
+      []
+    ],
+    [
+      "mega:GND.1",
+      "relay:GND",
+      "black",
+      []
+    ],
+    [
+      "relay:COM",
+      "mega:5V",
+      "red",
+      []
+    ],
+    [
+      "mega:9",
+      "r_red:1",
+      "red",
+      []
+    ],
+    [
+      "r_red:2",
+      "led_red:A",
+      "red",
+      []
+    ],
+    [
+      "led_red:C",
+      "mega:GND.1",
+      "black",
+      []
+    ],
+    [
+      "mega:12",
+      "r_green:1",
+      "green",
+      []
+    ],
+    [
+      "r_green:2",
+      "led_green:A",
+      "green",
+      []
+    ],
+    [
+      "led_green:C",
+      "mega:GND.1",
+      "black",
+      []
+    ],
+    [
+      "mega:11",
+      "r_yellow:1",
+      "yellow",
+      []
+    ],
+    [
+      "r_yellow:2",
+      "led_yellow:A",
+      "yellow",
+      []
+    ],
+    [
+      "led_yellow:C",
+      "mega:GND.1",
+      "black",
+      []
+    ]
   ],
   "serialMonitor": {
-    "display": "terminal",
+    "display": "plotter",
     "newline": "lf"
   }
 }
